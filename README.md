@@ -88,6 +88,19 @@ type FunctionMetrics struct {
 `Cognitive` is a pointer so a language without cognitive support is
 distinguishable (`nil`) from a genuine zero. For Go it is always populated.
 
+### Already have an AST?
+
+If you've already parsed Go source with `go/parser`, compute either metric for
+a single declaration without re-parsing:
+
+```go
+func Cyclomatic(body *ast.BlockStmt) int // 1 + branch points
+func Cognitive(fn *ast.FuncDecl) int     // SonarSource cognitive complexity
+```
+
+Both are nil-safe (return 0). This mirrors the AST-level entry points of
+[`gocyclo`][gocyclo] and [`gocognit`][gocognit].
+
 Parsing is best-effort: input that still yields a partial syntax tree is
 tolerated and metrics are computed for every recovered function; only a total
 parse failure returns an error.
