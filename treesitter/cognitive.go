@@ -13,10 +13,20 @@ import (
 // operators costs 1.
 //
 // It is enabled per-language via cognitiveSpecs. Languages without an entry
-// (currently Swift) return no values, so cognitive is reported as unavailable
-// (nil) rather than a wrong number. The C-family grammars model `else if` as a
-// nested if in the else branch; cognitiveSpec.elseField / elseParentType let
-// the walk recognise that shape and charge it the flat else-if cost.
+// return no values, so cognitive is reported as unavailable (nil) rather than a
+// wrong number. The C-family grammars model `else if` as a nested if in the
+// else branch; cognitiveSpec.elseField / elseParentType let the walk recognise
+// that shape and charge it the flat else-if cost.
+//
+// Swift is deliberately omitted (no spec) and must stay that way until the
+// upstream grammar is fixed: tree-sitter-swift mis-parses `else if` chains,
+// emitting ERROR nodes and degrading the enclosing function_declaration, so any
+// cognitive walk over a real function containing an else-if produces a wrong
+// number. Single if/else, guard, switch, for, while, repeat, and &&/|| all
+// parse clean — but else-if is common enough that a partial spec would
+// re-introduce the inconsistency (see file-search-on#491). Tracked upstream at
+// github.com/odvcencio/gotreesitter#131; re-add a swift entry only once that
+// closes and a real else-if function parses cleanly.
 
 // cognitiveSpec classifies one grammar's nodes for the cognitive walk.
 type cognitiveSpec struct {
