@@ -24,8 +24,8 @@ import (
 // cognitive walk over a real function containing an else-if produces a wrong
 // number. Single if/else, guard, switch, for, while, repeat, and &&/|| all
 // parse clean — but else-if is common enough that a partial spec would
-// re-introduce the inconsistency (see file-search-on#491). Tracked upstream at
-// github.com/odvcencio/gotreesitter#131; re-add a swift entry only once that
+// re-introduce the inconsistency (see richardwooding/file-search-on#491).
+// Tracked upstream at odvcencio/gotreesitter#131; re-add a swift entry once that
 // closes and a real else-if function parses cleanly.
 
 // cognitiveSpec classifies one grammar's nodes for the cognitive walk.
