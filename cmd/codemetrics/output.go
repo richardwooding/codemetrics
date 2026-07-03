@@ -62,11 +62,24 @@ func emitJSON(w io.Writer, rows []row) error {
 // cells. Widths are measured from the uncolored text; color is applied on top.
 func printTable(w io.Writer, rows []row, pal palette) {
 	const gap = 2
-	heads := []string{"COGNITIVE", "CYCLOMATIC", "LINES", "FUNCTION", "LOCATION"}
 
-	// cell holds a column's plain text (for width) and its display form (colored).
-	type cell struct{ plain, shown string }
-	data := make([][]cell, 0, len(rows))
+	// One row's cells: plain text (for width) alongside its colored display form.
+	type rowCells struct {
+		cogPlain, cogShown string
+		cyc                string
+		lines              string
+		fnPlain, fnShown   string
+		locPlain, locShown string
+	}
+
+	heads := [5]string{"COGNITIVE", "CYCLOMATIC", "LINES", "FUNCTION", "LOCATION"}
+	widths := [5]int{}
+	for i, h := range heads {
+		widths[i] = len(h)
+	}
+
+	// Single pass: build cells and grow column widths from the uncolored text.
+	data := make([]rowCells, 0, len(rows))
 	for _, r := range rows {
 		cog := "-"
 		if r.Cognitive != nil {
@@ -80,54 +93,46 @@ func printTable(w io.Writer, rows []row, pal palette) {
 			fnPlain += cue
 			fnShown += pal.muted(cue)
 		}
-		loc := r.File + ":" + strconv.Itoa(r.StartLine)
 		cyc := strconv.Itoa(r.Cyclomatic)
 		lines := strconv.Itoa(r.EndLine - r.StartLine + 1)
-		data = append(data, []cell{
-			{cog, pal.cognitive(cog)},
-			{cyc, cyc},
-			{lines, lines},
-			{fnPlain, fnShown},
-			{loc, pal.location(loc)},
+		loc := r.File + ":" + strconv.Itoa(r.StartLine)
+
+		for i, n := range [5]int{len(cog), len(cyc), len(lines), len(fnPlain), len(loc)} {
+			if n > widths[i] {
+				widths[i] = n
+			}
+		}
+		data = append(data, rowCells{
+			cogPlain: cog, cogShown: pal.cognitive(cog),
+			cyc:     cyc,
+			lines:   lines,
+			fnPlain: fnPlain, fnShown: fnShown,
+			locPlain: loc, locShown: pal.location(loc),
 		})
 	}
 
-	widths := make([]int, len(heads))
-	for i, h := range heads {
-		widths[i] = len(h)
-	}
-	for _, cells := range data {
-		for i, c := range cells {
-			if len(c.plain) > widths[i] {
-				widths[i] = len(c.plain)
-			}
-		}
-	}
-
 	var b strings.Builder
-	writeRow := func(plains, showns []string) {
-		for i := range plains {
-			b.WriteString(showns[i])
-			if i < len(plains)-1 { // no trailing padding on the last column
-				b.WriteString(strings.Repeat(" ", widths[i]-len(plains[i])+gap))
-			}
-		}
-		b.WriteByte('\n')
-	}
-	hp := make([]string, len(heads))
-	hs := make([]string, len(heads))
+	pad := func(n int) { b.WriteString(strings.Repeat(" ", n+gap)) }
+
 	for i, h := range heads {
-		hp[i] = h
-		hs[i] = pal.header(h)
-	}
-	writeRow(hp, hs)
-	for _, cells := range data {
-		p := make([]string, len(cells))
-		s := make([]string, len(cells))
-		for i, c := range cells {
-			p[i], s[i] = c.plain, c.shown
+		b.WriteString(pal.header(h))
+		if i < len(heads)-1 {
+			pad(widths[i] - len(h))
 		}
-		writeRow(p, s)
+	}
+	b.WriteByte('\n')
+
+	for _, c := range data {
+		b.WriteString(c.cogShown)
+		pad(widths[0] - len(c.cogPlain))
+		b.WriteString(c.cyc)
+		pad(widths[1] - len(c.cyc))
+		b.WriteString(c.lines)
+		pad(widths[2] - len(c.lines))
+		b.WriteString(c.fnShown)
+		pad(widths[3] - len(c.fnPlain))
+		b.WriteString(c.locShown) // last column: no trailing padding
+		b.WriteByte('\n')
 	}
 	_, _ = io.WriteString(w, b.String())
 }
