@@ -2,6 +2,8 @@
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/richardwooding/codemetrics.svg)](https://pkg.go.dev/github.com/richardwooding/codemetrics)
 
+**Website:** https://richardwooding.github.io/codemetrics
+
 Per-function **cyclomatic** and **cognitive** complexity across **17
 languages** — a **CLI** and **GitHub Action** that gate pull requests on
 complexity, plus a Go library.
@@ -257,8 +259,10 @@ for you; to run the CLI directly in a workflow instead:
 - run: codemetrics --diff origin/${{ github.base_ref }}...HEAD --max-cognitive 15 .
 ```
 
-> The CLI embeds the tree-sitter grammars (~22 MB binary). The **library**
-> packages stay dependency-light — this weight lives only in the `codemetrics`
+> The CLI embeds the tree-sitter grammars (~22 MB binary). The **root** library
+> package is standard-library-only, so importing it compiles no third-party
+> code; `gotreesitter` + grammars come in only with the `treesitter` subpackage,
+> and the CLI's deps (Kong, go-sarif, projectdetect) only with the `codemetrics`
 > command.
 
 ## Library usage
