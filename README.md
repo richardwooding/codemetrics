@@ -289,9 +289,8 @@ fns, err := treesitter.Parse("python", src) // -> []codemetrics.FunctionMetrics
 ```
 
 It returns the same `FunctionMetrics` type, so the two backends are
-interchangeable. Cognitive complexity is computed for **all** of these languages
-— Swift included (as of `gotreesitter` v0.20.7, which fixed the `else if`
-parse). `Cognitive` is populated for every supported language.
+interchangeable. Both cyclomatic and cognitive complexity are computed for every
+one of these languages.
 
 **Already parsed the tree?** If you've parsed the source with gotreesitter
 yourself (e.g. while extracting symbols), compute metrics over that existing
