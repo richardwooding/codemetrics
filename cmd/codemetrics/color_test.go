@@ -12,7 +12,7 @@ func TestColorEnabled(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	if !colorEnabled(f, "always") {
 		t.Error(`"always" should enable color`)
@@ -22,8 +22,8 @@ func TestColorEnabled(t *testing.T) {
 	}
 
 	t.Run("auto to a non-tty is off", func(t *testing.T) {
-		t.Setenv("NO_COLOR", "x") // track for restore …
-		os.Unsetenv("NO_COLOR")   // … then ensure it's unset for this case
+		t.Setenv("NO_COLOR", "x")   // track for restore …
+		_ = os.Unsetenv("NO_COLOR") // … then ensure it's unset for this case
 		if colorEnabled(f, "auto") {
 			t.Error("auto to a redirected file must be off")
 		}
