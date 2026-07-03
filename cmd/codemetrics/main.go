@@ -28,6 +28,8 @@ var version = "dev"
 
 // CLI is the Kong-parsed command line.
 type CLI struct {
+	Version kong.VersionFlag `help:"Print the version and exit."`
+
 	Paths []string `arg:"" optional:"" name:"path" help:"Files or directories to analyze; reads stdin when none are given."`
 
 	Sort   string `help:"Sort key for display: cognitive or cyclomatic." enum:"cognitive,cyclomatic" default:"cognitive"`
@@ -51,6 +53,7 @@ func main() {
 		kong.Name("codemetrics"),
 		kong.Description("Per-function cyclomatic and cognitive complexity, with SARIF output and a baseline quality gate."),
 		kong.UsageOnError(),
+		kong.Vars{"version": version},
 	)
 	code, err := run(cli)
 	if err != nil {
