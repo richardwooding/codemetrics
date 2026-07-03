@@ -1,5 +1,5 @@
 name: "codemetrics complexity gate"
-description: "Fail a pull request when a function it touches exceeds a cognitive/cyclomatic complexity threshold (go-codemetrics --diff mode)."
+description: "Fail a PR when a function it changes exceeds a cyclomatic/cognitive complexity threshold (diff mode)."
 author: "Richard Wooding"
 branding:
   icon: "bar-chart-2"
