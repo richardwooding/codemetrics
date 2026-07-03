@@ -2,6 +2,8 @@
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/richardwooding/codemetrics.svg)](https://pkg.go.dev/github.com/richardwooding/codemetrics)
 
+**Website:** https://richardwooding.github.io/codemetrics
+
 Per-function **cyclomatic** and **cognitive** complexity across **17
 languages** — a **CLI** and **GitHub Action** that gate pull requests on
 complexity, plus a Go library.

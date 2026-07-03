@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>codemetrics — complexity that gates your PRs</title>
+<meta name="description" content="Per-function cyclomatic and cognitive complexity across 17 languages, in one pass. A CLI and GitHub Action that gate pull requests on complexity, plus a Go library.">
+<meta name="theme-color" content="#0d1117">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%230d1117'/%3E%3Crect x='5' y='12' width='3.5' height='7' rx='1' fill='%23a371f7'/%3E%3Crect x='10.25' y='8' width='3.5' height='11' rx='1' fill='%23bd93ff'/%3E%3Crect x='15.5' y='4' width='3.5' height='15' rx='1' fill='%23d2b3ff'/%3E%3C/svg%3E">
+<meta property="og:type" content="website">
+<meta property="og:title" content="codemetrics — complexity that gates your PRs">
+<meta property="og:description" content="Per-function cyclomatic and cognitive complexity across 17 languages. CLI + GitHub Action + Go library.">
+<meta property="og:url" content="https://richardwooding.github.io/codemetrics/">
+<meta name="twitter:card" content="summary">
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel-2:#1c2230; --border:#2a3038;
+    --fg:#e6edf3; --muted:#9aa7b4; --faint:#6b7684;
+    --accent:#a371f7; --accent-2:#bd93ff; --accent-ink:#f5efff;
+    --green:#3fb950; --amber:#d29922; --radius:14px;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --maxw:1080px;
+  }
+  @media (prefers-color-scheme: light){
+    :root{
+      --bg:#ffffff; --panel:#f6f8fa; --panel-2:#eef1f5; --border:#d8dee4;
+      --fg:#1f2328; --muted:#59636e; --faint:#818b98;
+      --accent:#7c3aed; --accent-2:#6d28d9; --accent-ink:#ffffff;
+      --green:#1a7f37; --amber:#9a6700;
+    }
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:var(--bg); color:var(--fg);
+    font-family:var(--sans); line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:var(--accent-2); text-decoration:none}
+  a:hover{text-decoration:underline}
+  code,kbd,pre{font-family:var(--mono)}
+  .wrap{max-width:var(--maxw); margin:0 auto; padding:0 20px}
+  h1,h2,h3{line-height:1.2; letter-spacing:-0.02em; margin:0}
+  section{padding:72px 0; border-top:1px solid var(--border)}
+  .eyebrow{color:var(--accent-2); font-weight:700; font-size:.8rem; letter-spacing:.08em; text-transform:uppercase; margin:0 0 10px}
+  .lede{color:var(--muted); font-size:1.05rem; max-width:60ch}
+
+  /* nav */
+  header.nav{position:sticky; top:0; z-index:20; backdrop-filter:blur(10px);
+    background:color-mix(in srgb, var(--bg) 82%, transparent); border-bottom:1px solid var(--border)}
+  .nav .wrap{display:flex; align-items:center; gap:18px; height:60px}
+  .brand{display:flex; align-items:center; gap:10px; font-weight:700; color:var(--fg); font-size:1.05rem}
+  .brand svg{display:block}
+  .nav nav{margin-left:auto; display:flex; align-items:center; gap:22px}
+  .nav nav a{color:var(--muted); font-weight:600; font-size:.95rem}
+  .nav nav a:hover{color:var(--fg); text-decoration:none}
+  .btn{display:inline-flex; align-items:center; gap:8px; font-weight:700; font-size:.95rem;
+    padding:10px 16px; border-radius:10px; border:1px solid var(--border); cursor:pointer}
+  .btn.primary{background:linear-gradient(180deg,var(--accent),var(--accent-2)); color:var(--accent-ink); border-color:transparent}
+  .btn.primary:hover{filter:brightness(1.07); text-decoration:none}
+  .btn.ghost{background:var(--panel); color:var(--fg)}
+  .btn.ghost:hover{border-color:var(--accent); text-decoration:none}
+  .nav-toggle{display:none; margin-left:auto; background:var(--panel); color:var(--fg);
+    border:1px solid var(--border); border-radius:8px; padding:8px 10px; cursor:pointer}
+
+  /* hero */
+  .hero{padding:84px 0 64px; border-top:0}
+  .hero h1{font-size:clamp(2.1rem,5.2vw,3.4rem); font-weight:800}
+  .hero .grad{background:linear-gradient(90deg,var(--accent-2),#e9d5ff); -webkit-background-clip:text; background-clip:text; color:transparent}
+  .hero p.sub{font-size:1.2rem; color:var(--muted); margin:18px 0 28px; max-width:56ch}
+  .cta{display:flex; gap:12px; flex-wrap:wrap}
+  .hero-grid{display:grid; grid-template-columns:1.05fr 1fr; gap:44px; align-items:center}
+  @media (max-width:860px){ .hero-grid{grid-template-columns:1fr; gap:32px} }
+
+  /* terminal */
+  .term{background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden;
+    box-shadow:0 20px 50px -30px rgba(0,0,0,.7)}
+  .term .bar{display:flex; align-items:center; gap:7px; padding:11px 14px; background:var(--panel-2); border-bottom:1px solid var(--border)}
+  .dot{width:11px; height:11px; border-radius:50%}
+  .term .bar .t{margin-left:10px; color:var(--faint); font:600 .8rem/1 var(--mono)}
+  .term pre{margin:0; padding:16px; overflow-x:auto; font-size:.82rem; line-height:1.65}
+  .term .cmd{color:var(--fg)} .term .pr{color:var(--accent-2)}
+  .term .hd{color:var(--faint)} .term .n{color:var(--accent-2); font-weight:700}
+  .term .fn{color:var(--fg)} .term .loc{color:var(--muted)}
+  .term .ok{color:var(--green)} .term .warn{color:var(--amber)}
+
+  /* badges */
+  .badges{display:flex; flex-wrap:wrap; gap:8px; margin-top:26px}
+  .lang{font:700 .72rem/1 var(--mono); color:var(--fg); background:var(--panel);
+    border:1px solid var(--border); border-radius:999px; padding:6px 11px}
+  .lang b{color:var(--accent-2)}
+
+  /* cards / grid */
+  .grid{display:grid; gap:18px}
+  .two{grid-template-columns:1fr 1fr}
+  .feat{grid-template-columns:repeat(3,1fr)}
+  @media (max-width:820px){ .feat{grid-template-columns:1fr 1fr} }
+  @media (max-width:560px){ .two,.feat{grid-template-columns:1fr} }
+  .card{background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); padding:22px}
+  .card h3{font-size:1.05rem; margin-bottom:8px; display:flex; align-items:center; gap:10px}
+  .card p{color:var(--muted); margin:0; font-size:.95rem}
+  .icon{width:34px; height:34px; flex:none; display:grid; place-items:center; border-radius:9px;
+    background:color-mix(in srgb, var(--accent) 18%, transparent); color:var(--accent-2)}
+  .icon svg{width:18px; height:18px}
+  .metric-num{font:800 2rem/1 var(--mono); color:var(--accent-2)}
+
+  /* code blocks */
+  pre.code{background:var(--panel); border:1px solid var(--border); border-radius:var(--radius);
+    padding:16px 18px; overflow-x:auto; font-size:.85rem; line-height:1.6; margin:0}
+  pre.code .c{color:var(--faint)} pre.code .k{color:var(--accent-2)} pre.code .s{color:var(--green)}
+  .split{display:grid; grid-template-columns:1fr 1fr; gap:22px; align-items:start}
+  @media (max-width:760px){ .split{grid-template-columns:1fr} }
+
+  /* install */
+  .install{display:grid; gap:14px; max-width:760px}
+  .snip{display:flex; align-items:center; gap:12px; background:var(--panel); border:1px solid var(--border);
+    border-radius:12px; padding:6px 6px 6px 16px}
+  .snip .lbl{font:700 .72rem/1 var(--mono); color:var(--accent-2); text-transform:uppercase; letter-spacing:.05em; flex:none; width:74px}
+  .snip code{flex:1; overflow-x:auto; white-space:nowrap; color:var(--fg); font-size:.88rem; padding:8px 0}
+  .copy{flex:none; background:var(--panel-2); color:var(--muted); border:1px solid var(--border);
+    border-radius:8px; padding:8px 12px; font:700 .78rem/1 var(--sans); cursor:pointer}
+  .copy:hover{color:var(--fg); border-color:var(--accent)}
+  .copy.done{color:var(--green); border-color:var(--green)}
+
+  footer{border-top:1px solid var(--border); padding:40px 0 60px; color:var(--muted)}
+  footer .wrap{display:flex; flex-wrap:wrap; gap:18px 28px; align-items:center; justify-content:space-between}
+  footer a{color:var(--muted); font-weight:600; font-size:.92rem}
+  footer a:hover{color:var(--fg)}
+  .fnav{display:flex; flex-wrap:wrap; gap:18px}
+
+  @media (max-width:680px){
+    .nav nav{display:none} .nav nav.open{display:flex; position:absolute; top:60px; left:0; right:0;
+      flex-direction:column; gap:0; background:var(--bg); border-bottom:1px solid var(--border); padding:8px 20px 16px}
+    .nav nav.open a{padding:10px 0} .nav-toggle{display:block}
+    .nav nav.open .btn{display:none}
+  }
+</style>
+</head>
+<body>
+<a href="#main" style="position:absolute;left:-9999px" onfocus="this.style.left='12px';this.style.top='10px';this.style.zIndex='50'">Skip to content</a>
+
+<header class="nav">
+  <div class="wrap">
+    <span class="brand">
+      <svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true">
+        <rect width="24" height="24" rx="6" fill="var(--panel-2)"/>
+        <rect x="5" y="12" width="3.5" height="7" rx="1" fill="var(--accent)"/>
+        <rect x="10.25" y="8" width="3.5" height="11" rx="1" fill="var(--accent-2)"/>
+        <rect x="15.5" y="4" width="3.5" height="15" rx="1" fill="#d2b3ff"/>
+      </svg>
+      codemetrics
+    </span>
+    <button class="nav-toggle" aria-label="Toggle navigation" onclick="document.getElementById('nav').classList.toggle('open')">☰</button>
+    <nav id="nav">
+      <a href="#metrics">Metrics</a>
+      <a href="#features">Features</a>
+      <a href="#ci">CI</a>
+      <a href="#install">Install</a>
+      <a href="https://github.com/richardwooding/codemetrics#readme">Docs</a>
+      <a class="btn ghost" href="https://github.com/richardwooding/codemetrics">GitHub ★</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+<section class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <p class="eyebrow">cyclomatic + cognitive · 17 languages</p>
+      <h1>Complexity that <span class="grad">gates your PRs.</span></h1>
+      <p class="sub">Per-function <b>cyclomatic</b> and <b>cognitive</b> complexity in one pass — a CLI and GitHub Action that fail a pull request when the code it touches gets too gnarly. Plus a zero-dependency Go library.</p>
+      <div class="cta">
+        <a class="btn primary" href="#install">Get started</a>
+        <a class="btn ghost" href="https://github.com/richardwooding/codemetrics">View on GitHub</a>
+      </div>
+      <div class="badges" aria-label="Supported languages">
+        <span class="lang"><b>Go</b></span><span class="lang">Python</span><span class="lang">JavaScript</span>
+        <span class="lang">TypeScript</span><span class="lang">Java</span><span class="lang">Rust</span>
+        <span class="lang">C</span><span class="lang">C++</span><span class="lang">C#</span>
+        <span class="lang">Kotlin</span><span class="lang">PHP</span><span class="lang">Ruby</span>
+        <span class="lang">Scala</span><span class="lang">R</span><span class="lang">MATLAB</span>
+        <span class="lang">Perl</span><span class="lang">Swift</span>
+      </div>
+    </div>
+    <div class="term" role="img" aria-label="Terminal showing codemetrics ranking functions by complexity">
+      <div class="bar"><span class="dot" style="background:#ff5f56"></span><span class="dot" style="background:#ffbd2e"></span><span class="dot" style="background:#27c93f"></span><span class="t">codemetrics</span></div>
+<pre><span class="pr">$</span> <span class="cmd">codemetrics --top 5 --max-cognitive 15 .</span>
+<span class="hd">COGNITIVE  CYCLOMATIC  FUNCTION              LOCATION</span>
+<span class="n">46</span>         19          cognitiveComplexity   cognitive.go:145
+<span class="n">33</span>         18          MetricsFromTree       treesitter.go:177
+<span class="n">31</span>         16          collectFuncSpans      treesitter.go:220
+<span class="n">28</span>         17          tagElseIf             cognitive.go:218
+<span class="n">24</span>         14          run                   main.go:70
+<span class="warn">codemetrics: 5 finding(s)</span>
+<span class="pr">$</span> <span class="cmd">echo $?</span>
+<span class="ok">1</span>  <span class="loc"># gate failed — CI is red</span></pre>
+    </div>
+  </div>
+</section>
+
+<section id="metrics">
+  <div class="wrap">
+    <p class="eyebrow">the two metrics</p>
+    <h2>Two lenses, one parse.</h2>
+    <p class="lede" style="margin:12px 0 28px">Most tools give you one or the other. codemetrics computes both together and reports them side by side.</p>
+    <div class="grid two">
+      <div class="card">
+        <div class="metric-num">McCabe</div>
+        <h3 style="margin-top:10px">Cyclomatic</h3>
+        <p>Counts decision points flatly — <code>1 + one per branch</code> (if / for / case / <code>&amp;&amp;</code> / <code>||</code>). It measures the number of independent paths through a function.</p>
+      </div>
+      <div class="card">
+        <div class="metric-num">SonarSource</div>
+        <h3 style="margin-top:10px">Cognitive</h3>
+        <p>Weights <b>nested</b> control flow more heavily, so deeply-nested logic scores higher than a flat sequence with the same branch count. It tracks how hard code is to <i>understand</i>. Matches <code>gocognit</code>.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="features">
+  <div class="wrap">
+    <p class="eyebrow">what you get</p>
+    <h2>A quality gate, not just a number.</h2>
+    <div class="grid feat" style="margin-top:28px">
+      <div class="card"><h3><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M12 3v18"/></svg></span>Polyglot</h3><p>17 languages. Go via the stdlib <code>go/ast</code>; 16 more via tree-sitter — same metrics, one tool.</p></div>
+      <div class="card"><h3><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg></span>Quality gate</h3><p>Set <code>--max-cognitive</code> / <code>--max-cyclomatic</code>; the process exits non-zero when a function is over budget.</p></div>
+      <div class="card"><h3><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v12H4z"/><path d="M8 20h8"/></svg></span>SARIF output</h3><p><code>--format sarif</code> uploads straight to GitHub Code Scanning — findings land in the PR's Files-changed view.</p></div>
+      <div class="card"><h3><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3v12"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="6" r="3"/><path d="M18 9c0 6-12 3-12 6"/></svg></span>PR mode</h3><p><code>--diff origin/main...HEAD</code> judges only the functions a pull request actually changes.</p></div>
+      <div class="card"><h3><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h10"/></svg></span>Baseline</h3><p>Adopt on legacy code without a big-bang cleanup: record a baseline and fail only on <i>new</i> complexity.</p></div>
+      <div class="card"><h3><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5L20 7"/></svg></span>Suppression</h3><p>Opt a function out with <code>//gocyclo:ignore</code>, <code>//nolint</code>, or <code>codemetrics:ignore</code> — gocyclo/gocognit-compatible.</p></div>
+      <div class="card"><h3><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><path d="M4 9h16"/></svg></span>GitHub Action</h3><p>Drop the Marketplace action into a workflow and every PR is gated — no runner setup, no Docker.</p></div>
+      <div class="card"><h3><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/></svg></span>Zero-dep library</h3><p>The Go module root is <code>go/ast</code>-only and pulls in nothing — embed it without dragging in tree-sitter.</p></div>
+      <div class="card"><h3><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/></svg></span>Skips the noise</h3><p>Vendored and minified files (bundled libs, <code>*.min.js</code>) are skipped by default, powered by <code>projectdetect</code>.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="ci">
+  <div class="wrap">
+    <p class="eyebrow">in your pipeline</p>
+    <h2>Gate every pull request.</h2>
+    <p class="lede" style="margin:12px 0 28px">Add the Action and fail the check when a function the PR touches exceeds your threshold. Existing debt is left alone.</p>
+    <div class="split">
+      <div>
+        <h3 style="font-size:1rem; margin-bottom:12px; color:var(--muted)">GitHub Action</h3>
+<pre class="code"><span class="k">name</span>: complexity
+<span class="k">on</span>: pull_request
+<span class="k">jobs</span>:
+  gate:
+    <span class="k">runs-on</span>: ubuntu-latest
+    <span class="k">steps</span>:
+      - <span class="k">uses</span>: actions/checkout@v4
+        <span class="k">with</span>: {<span class="k">fetch-depth</span>: 0}
+      - <span class="k">uses</span>: richardwooding/codemetrics@v0.10.0
+        <span class="k">with</span>:
+          <span class="k">max-cognitive</span>: <span class="s">"15"</span></pre>
+      </div>
+      <div>
+        <h3 style="font-size:1rem; margin-bottom:12px; color:var(--muted)">…or the CLI, anywhere</h3>
+<pre class="code"><span class="c"># Fail only on functions this PR changed</span>
+codemetrics --diff origin/main...HEAD \
+  --max-cognitive 15 .
+
+<span class="c"># Adopt on an existing repo via a baseline</span>
+codemetrics --max-cognitive 15 \
+  --write-baseline .codemetrics.json .
+
+<span class="c"># SARIF for GitHub Code Scanning</span>
+codemetrics --format sarif \
+  --max-cognitive 15 . &gt; results.sarif</pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="install">
+  <div class="wrap">
+    <p class="eyebrow">install</p>
+    <h2>One binary, no dependencies.</h2>
+    <p class="lede" style="margin:12px 0 28px">Grab it however you like — the CLI ships as a single static binary.</p>
+    <div class="install">
+      <div class="snip"><span class="lbl">brew</span><code id="i1">brew install --cask richardwooding/tap/codemetrics</code><button class="copy" data-t="i1">Copy</button></div>
+      <div class="snip"><span class="lbl">go</span><code id="i2">go install github.com/richardwooding/codemetrics/cmd/codemetrics@latest</code><button class="copy" data-t="i2">Copy</button></div>
+      <div class="snip"><span class="lbl">action</span><code id="i3">uses: richardwooding/codemetrics@v0.10.0</code><button class="copy" data-t="i3">Copy</button></div>
+    </div>
+    <p style="color:var(--muted); margin-top:18px; font-size:.95rem">Or download a prebuilt binary for macOS, Linux, or Windows from the <a href="https://github.com/richardwooding/codemetrics/releases">releases page</a>.</p>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span class="brand" style="font-size:.98rem">
+      <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="12" width="3.5" height="7" rx="1" fill="var(--accent)"/><rect x="10.25" y="8" width="3.5" height="11" rx="1" fill="var(--accent-2)"/><rect x="15.5" y="4" width="3.5" height="15" rx="1" fill="#d2b3ff"/></svg>
+      codemetrics · MIT · <span id="yr"></span>
+    </span>
+    <nav class="fnav">
+      <a href="https://github.com/richardwooding/codemetrics">GitHub</a>
+      <a href="https://github.com/richardwooding/codemetrics/releases">Releases</a>
+      <a href="https://github.com/richardwooding/codemetrics#readme">Docs</a>
+      <a href="https://github.com/richardwooding/projectdetect">projectdetect</a>
+      <a href="https://github.com/richardwooding/go-sarif">go-sarif</a>
+    </nav>
+  </div>
+</footer>
+
+<script>
+  document.getElementById('yr').textContent = new Date().getFullYear();
+  document.querySelectorAll('.copy').forEach(function(b){
+    b.addEventListener('click', function(){
+      var el = document.getElementById(b.dataset.t);
+      navigator.clipboard.writeText(el.textContent).then(function(){
+        var old = b.textContent; b.textContent = 'Copied'; b.classList.add('done');
+        setTimeout(function(){ b.textContent = old; b.classList.remove('done'); }, 1400);
+      });
+    });
+  });
+</script>
+</body>
+</html>
