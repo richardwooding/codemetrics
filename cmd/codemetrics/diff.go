@@ -29,7 +29,9 @@ func changedLines(base string) (map[string][]lineRange, error) {
 	if err != nil {
 		return nil, err
 	}
-	cmd := exec.Command("git", "diff", "--unified=0", "--no-color", base)
+	// Force standard a/ and b/ path prefixes so parsing is immune to a user's
+	// diff.noprefix / diff.mnemonicPrefix / custom-prefix git config.
+	cmd := exec.Command("git", "diff", "--unified=0", "--no-color", "--src-prefix=a/", "--dst-prefix=b/", base)
 	cmd.Dir = root
 	var out, stderr bytes.Buffer
 	cmd.Stdout = &out
@@ -54,24 +56,33 @@ func gitRoot() (string, error) {
 }
 
 // parseDiff extracts new-side changed line ranges from unified diff output,
-// keying by absolute path (root joined with the diff's "b/" path).
+// keying by canonical (absolute, symlink-resolved) path.
+//
+// File headers are only trusted between a "diff --git" line and that section's
+// first hunk. This matters because with --unified=0 an added source line like
+// "++ x" renders as "+++ x" in the body — identical to a new-file header — so
+// scanning for "+++ " everywhere would corrupt path tracking. Gating on the
+// section state (plus the forced "b/" prefix) makes that impossible.
 func parseDiff(root string, diff []byte) map[string][]lineRange {
 	changed := map[string][]lineRange{}
 	var curFile string
+	expectHeader := false
 	sc := bufio.NewScanner(bytes.NewReader(diff))
 	sc.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
 	for sc.Scan() {
 		line := sc.Text()
 		switch {
-		case strings.HasPrefix(line, "+++ "):
-			p := strings.TrimPrefix(line, "+++ ")
-			if p == "/dev/null" {
+		case strings.HasPrefix(line, "diff --git "):
+			expectHeader = true // file headers follow, then hunks
+			curFile = ""
+		case expectHeader && (strings.HasPrefix(line, "+++ b/") || line == "+++ /dev/null"):
+			if line == "+++ /dev/null" {
 				curFile = "" // deleted file: nothing on the new side
 				continue
 			}
-			p = strings.TrimPrefix(p, "b/")
-			curFile = filepath.Join(root, p)
+			curFile = canonicalPath(filepath.Join(root, strings.TrimPrefix(line, "+++ b/")))
 		case strings.HasPrefix(line, "@@"):
+			expectHeader = false // headers for this section are done
 			if curFile == "" {
 				continue
 			}
@@ -113,11 +124,7 @@ func parseHunkNewRange(header string) (lineRange, bool) {
 func filterToDiff(rows []row, changed map[string][]lineRange) []row {
 	out := make([]row, 0, len(rows))
 	for _, r := range rows {
-		abs, err := filepath.Abs(r.File)
-		if err != nil {
-			continue
-		}
-		ranges, ok := changed[abs]
+		ranges, ok := changed[canonicalPath(r.File)]
 		if !ok {
 			continue
 		}
@@ -126,6 +133,21 @@ func filterToDiff(rows []row, changed map[string][]lineRange) []row {
 		}
 	}
 	return out
+}
+
+// canonicalPath returns the absolute, symlink-resolved form of path so the
+// paths from git diff and the walked source files compare equal regardless of
+// symlinks or casing quirks. Falls back to the absolute (then raw) path when
+// the file can't be resolved — e.g. it doesn't exist on disk.
+func canonicalPath(path string) string {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return path
+	}
+	if eval, err := filepath.EvalSymlinks(abs); err == nil {
+		return eval
+	}
+	return abs
 }
 
 // overlapsAny reports whether [start,end] intersects any of ranges (all

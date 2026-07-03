@@ -27,12 +27,16 @@ func TestParseHunkNewRange(t *testing.T) {
 }
 
 func TestParseDiff(t *testing.T) {
-	root := "/repo"
+	root := t.TempDir() // real platform-native absolute path
+	// The first added line below is an added source line whose content is
+	// "++ x" — it renders as "+++ x" in the body and must NOT be mistaken for
+	// a file header.
 	diff := `diff --git a/src/calc.py b/src/calc.py
 index 111..222 100644
 --- a/src/calc.py
 +++ b/src/calc.py
-@@ -3,0 +4,5 @@ def classify(n):
+@@ -3,0 +4,6 @@ def classify(n):
++++ decoy line that looks like a header
 +    for i in range(n):
 +        if i:
 +            pass
@@ -56,8 +60,8 @@ index 444..555 100644
 `
 	got := parseDiff(root, []byte(diff))
 	want := map[string][]lineRange{
-		filepath.Join(root, "src/calc.py"): {{4, 8}},
-		filepath.Join(root, "main.go"):     {{10, 10}},
+		canonicalPath(filepath.Join(root, "src/calc.py")): {{4, 9}},
+		canonicalPath(filepath.Join(root, "main.go")):     {{10, 10}},
 		// old.go maps to /dev/null on the new side → excluded entirely.
 	}
 	if !reflect.DeepEqual(got, want) {
@@ -86,19 +90,16 @@ func TestOverlapsAny(t *testing.T) {
 }
 
 func TestFilterToDiff(t *testing.T) {
-	// Use absolute paths so filepath.Abs is a no-op and keys match.
-	fileA, _ := filepath.Abs("pkg/a.go")
-	fileB, _ := filepath.Abs("pkg/b.go")
+	// Key by canonicalPath, exactly as filterToDiff looks rows up.
 	rows := []row{
 		{File: "pkg/a.go", Function: "Touched", StartLine: 8, EndLine: 15},    // overlaps [10,12]
 		{File: "pkg/a.go", Function: "Untouched", StartLine: 40, EndLine: 60}, // no overlap
 		{File: "pkg/b.go", Function: "OtherFile", StartLine: 1, EndLine: 5},   // file not in diff
 	}
 	changed := map[string][]lineRange{
-		fileA: {{10, 12}},
-		// fileB intentionally absent
+		canonicalPath("pkg/a.go"): {{10, 12}},
+		// pkg/b.go intentionally absent
 	}
-	_ = fileB
 	got := filterToDiff(rows, changed)
 	if len(got) != 1 || got[0].Function != "Touched" {
 		t.Fatalf("filterToDiff kept %+v; want only Touched", got)
