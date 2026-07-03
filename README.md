@@ -2,17 +2,16 @@
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/richardwooding/go-codemetrics.svg)](https://pkg.go.dev/github.com/richardwooding/go-codemetrics)
 
-Per-function **cyclomatic** and **cognitive** complexity for source code — a
-**CLI** and **GitHub Action** that gate pull requests on complexity, plus a
-small **Go library**.
+Per-function **cyclomatic** and **cognitive** complexity across **17
+languages** — a **CLI** and **GitHub Action** that gate pull requests on
+complexity, plus a Go library.
 
-Most Go tools give you one metric or the other: [`fzipp/gocyclo`][gocyclo] does
-cyclomatic, [`uudashr/gocognit`][gocognit] does cognitive. `go-codemetrics`
-computes **both in one pass** behind a single API, and is structured so more
-languages can be added behind `Parse` without breaking callers.
-
-The Go analyzer is built on the standard library's `go/ast` — **zero external
-dependencies**.
+It computes **both metrics in one pass**, where most tools give you just one
+(for Go, [`fzipp/gocyclo`][gocyclo] does cyclomatic and
+[`uudashr/gocognit`][gocognit] does cognitive). Go is analyzed with the standard
+library's `go/ast` and 16 more languages via
+[tree-sitter](#other-languages-tree-sitter) — both backends return the same
+`FunctionMetrics`.
 
 ## The two metrics
 
@@ -247,14 +246,15 @@ type FunctionMetrics struct {
 	Name       string // bare name, e.g. "Write"
 	Receiver   string // receiver type for methods, e.g. "*Buffer"; "" otherwise
 	Cyclomatic int
-	Cognitive  *int   // nil if unavailable for the language; always set for Go
+	Cognitive  *int   // nil if a language reports no cognitive score; set for all supported today
 	StartLine  int    // 1-based, inclusive
 	EndLine    int
 }
 ```
 
-`Cognitive` is a pointer so a language without cognitive support is
-distinguishable (`nil`) from a genuine zero. For Go it is always populated.
+`Cognitive` is a pointer so a language that reports no cognitive score is
+distinguishable (`nil`) from a genuine zero — though every language supported
+today populates it.
 
 ### Already have an AST?
 
@@ -289,9 +289,9 @@ fns, err := treesitter.Parse("python", src) // -> []codemetrics.FunctionMetrics
 ```
 
 It returns the same `FunctionMetrics` type, so the two backends are
-interchangeable. Cognitive complexity is computed for every language except
-Swift (whose grammar lacks a stable cognitive spec) — there `Cognitive` is nil
-while `Cyclomatic` is still reported.
+interchangeable. Cognitive complexity is computed for **all** of these languages
+— Swift included (as of `gotreesitter` v0.20.7, which fixed the `else if`
+parse). `Cognitive` is populated for every supported language.
 
 **Already parsed the tree?** If you've parsed the source with gotreesitter
 yourself (e.g. while extracting symbols), compute metrics over that existing
