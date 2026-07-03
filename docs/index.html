@@ -87,9 +87,14 @@
 
   /* badges */
   .badges{display:flex; flex-wrap:wrap; gap:8px; margin-top:26px}
-  .lang{font:700 .72rem/1 var(--mono); color:var(--fg); background:var(--panel);
-    border:1px solid var(--border); border-radius:999px; padding:6px 11px}
-  .lang b{color:var(--accent-2)}
+  .lang{font:700 .72rem/1 var(--mono); color:var(--muted); background:var(--panel);
+    border:1px solid var(--border); border-radius:999px; padding:7px 12px; cursor:pointer;
+    transition:color .12s, border-color .12s, background .12s}
+  .lang:hover{color:var(--fg); border-color:var(--accent)}
+  .lang:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+  .lang[aria-selected="true"]{background:linear-gradient(180deg,var(--accent),var(--accent-2));
+    color:var(--accent-ink); border-color:transparent}
+  .hint{color:var(--faint); font-size:.82rem; margin-top:10px}
 
   /* cards / grid */
   .grid{display:grid; gap:18px}
@@ -174,27 +179,35 @@
         <a class="btn primary" href="#install">Get started</a>
         <a class="btn ghost" href="https://github.com/richardwooding/codemetrics">View on GitHub</a>
       </div>
-      <div class="badges" aria-label="Supported languages">
-        <span class="lang"><b>Go</b></span><span class="lang">Python</span><span class="lang">JavaScript</span>
-        <span class="lang">TypeScript</span><span class="lang">Java</span><span class="lang">Rust</span>
-        <span class="lang">C</span><span class="lang">C++</span><span class="lang">C#</span>
-        <span class="lang">Kotlin</span><span class="lang">PHP</span><span class="lang">Ruby</span>
-        <span class="lang">Scala</span><span class="lang">R</span><span class="lang">MATLAB</span>
-        <span class="lang">Perl</span><span class="lang">Swift</span>
+      <div class="badges" role="tablist" aria-label="Pick a language to see an example">
+        <button class="lang" role="tab" data-lang="python" aria-selected="true">Python</button>
+        <button class="lang" role="tab" data-lang="typescript" aria-selected="false">TypeScript</button>
+        <button class="lang" role="tab" data-lang="javascript" aria-selected="false">JavaScript</button>
+        <button class="lang" role="tab" data-lang="java" aria-selected="false">Java</button>
+        <button class="lang" role="tab" data-lang="rust" aria-selected="false">Rust</button>
+        <button class="lang" role="tab" data-lang="cpp" aria-selected="false">C++</button>
+        <button class="lang" role="tab" data-lang="c" aria-selected="false">C</button>
+        <button class="lang" role="tab" data-lang="csharp" aria-selected="false">C#</button>
+        <button class="lang" role="tab" data-lang="kotlin" aria-selected="false">Kotlin</button>
+        <button class="lang" role="tab" data-lang="swift" aria-selected="false">Swift</button>
+        <button class="lang" role="tab" data-lang="go" aria-selected="false">Go</button>
+        <button class="lang" role="tab" data-lang="php" aria-selected="false">PHP</button>
+        <button class="lang" role="tab" data-lang="ruby" aria-selected="false">Ruby</button>
+        <button class="lang" role="tab" data-lang="scala" aria-selected="false">Scala</button>
+        <button class="lang" role="tab" data-lang="r" aria-selected="false">R</button>
+        <button class="lang" role="tab" data-lang="perl" aria-selected="false">Perl</button>
+        <button class="lang" role="tab" data-lang="matlab" aria-selected="false">MATLAB</button>
       </div>
+      <p class="hint">↑ Click a language — 17 supported, analyzed by the same tool.</p>
     </div>
-    <div class="term" role="img" aria-label="Terminal showing codemetrics ranking functions by complexity">
-      <div class="bar"><span class="dot" style="background:#ff5f56"></span><span class="dot" style="background:#ffbd2e"></span><span class="dot" style="background:#27c93f"></span><span class="t">codemetrics</span></div>
-<pre><span class="pr">$</span> <span class="cmd">codemetrics --top 5 --max-cognitive 15 .</span>
-<span class="hd">COGNITIVE  CYCLOMATIC  FUNCTION              LOCATION</span>
-<span class="n">46</span>         19          cognitiveComplexity   cognitive.go:145
-<span class="n">33</span>         18          MetricsFromTree       treesitter.go:177
-<span class="n">31</span>         16          collectFuncSpans      treesitter.go:220
-<span class="n">28</span>         17          tagElseIf             cognitive.go:218
-<span class="n">24</span>         14          run                   main.go:70
-<span class="warn">codemetrics: 5 finding(s)</span>
-<span class="pr">$</span> <span class="cmd">echo $?</span>
-<span class="ok">1</span>  <span class="loc"># gate failed — CI is red</span></pre>
+    <div class="term">
+      <div class="bar"><span class="dot" style="background:#ff5f56"></span><span class="dot" style="background:#ffbd2e"></span><span class="dot" style="background:#27c93f"></span><span class="t" id="term-title">codemetrics — python</span></div>
+<pre id="termout" aria-live="polite" aria-label="Example codemetrics output"><span class="pr">$</span> <span class="cmd">codemetrics --top 3 .</span>
+<span class="hd">COGNITIVE  CYCLOMATIC  FUNCTION             LOCATION</span>
+<span class="n">57</span>         24          <span class="fn">Query.add_q          </span><span class="loc">sql/query.py:1380</span>
+<span class="n">41</span>         19          <span class="fn">resolve_lookup       </span><span class="loc">template/base.py:812</span>
+<span class="n">29</span>         15          <span class="fn">parse_http_date      </span><span class="loc">utils/http.py:176</span>
+<span class="warn">codemetrics: 3 finding(s)</span></pre>
     </div>
   </div>
 </section>
@@ -308,6 +321,52 @@ codemetrics --format sarif \
 
 <script>
   document.getElementById('yr').textContent = new Date().getFullYear();
+
+  // Per-language hero examples. rows: [cognitive, cyclomatic, function, location]
+  var EXAMPLES = {
+    python:     {label:'python',     path:'.',               rows:[[57,24,'Query.add_q','sql/query.py:1380'],[41,19,'resolve_lookup','template/base.py:812'],[29,15,'parse_http_date','utils/http.py:176']]},
+    typescript: {label:'typescript', path:'src/',            rows:[[112,48,'convertSchema','from-json-schema.ts:146'],[64,29,'inferType','checker.ts:88'],[38,21,'parseExpression','parser.ts:530']]},
+    javascript: {label:'javascript', path:'.',               rows:[[88,36,'compileTemplate','compiler.js:204'],[52,27,'mergeConfig','config.js:390'],[33,18,'runMicrotasks','scheduler.js:77']]},
+    java:       {label:'java',       path:'src/main/java',   rows:[[74,33,'parseAnnotation','RequestFactory.java:367'],[45,22,'resolveType','TypeResolver.java:210'],[30,17,'dispatch','Router.java:96']]},
+    rust:       {label:'rust',       path:'src/',            rows:[[61,28,'parse_pattern','ast.rs:512'],[40,20,'resolve_lifetimes','borrowck.rs:1180'],[26,14,'poll_next','stream.rs:88']]},
+    cpp:        {label:'cpp',        path:'src/',            rows:[[70,31,'parseDeclarator','Parser.cpp:1442'],[44,23,'foldConstant','Constant.cpp:210'],[28,16,'emitBlock','CodeGen.cpp:509']]},
+    c:          {label:'c',          path:'src/',            rows:[[93,41,'is_word','mktable.c:919'],[58,30,'fold_case','unicode.c:288'],[34,19,'compile_node','regcomp.c:633']]},
+    csharp:     {label:'csharp',     path:'src/',            rows:[[66,27,'WriteEscapedText','JavaScriptUtils.cs:147'],[41,20,'ReadNumber','JsonTextReader.cs:1981'],[25,14,'ResolveContract','ContractResolver.cs:330']]},
+    kotlin:     {label:'kotlin',     path:'src/',            rows:[[58,25,'buildPipeline','Pipeline.kt:120'],[36,18,'parseRoute','Routing.kt:88'],[22,12,'encodeValue','Json.kt:210']]},
+    swift:      {label:'swift',      path:'Sources/',        rows:[[49,23,'validate','Request.swift:210'],[32,17,'encodeParams','URLEncoding.swift:88'],[20,11,'responseData','Response.swift:140']]},
+    go:         {label:'go',         path:'.',               rows:[[45,19,'getCompletions','completions.go:316'],[30,17,'findRoute','tree.go:401'],[22,13,'execute','command.go:940']]},
+    php:        {label:'php',        path:'src/',            rows:[[67,30,'applyOptions','CurlFactory.php:773'],[43,21,'formatInterval','CarbonInterval.php:1925'],[27,15,'matchRoute','Router.php:140']]},
+    ruby:       {label:'ruby',       path:'lib/',            rows:[[54,24,'build_arel','relation.rb:640'],[35,17,'render_template','base.rb:210'],[21,12,'parse_headers','request.rb:88']]},
+    scala:      {label:'scala',      path:'src/',            rows:[[60,26,'typecheck','Typer.scala:1180'],[38,19,'optimize','Optimizer.scala:305'],[24,13,'parseTerm','Parsers.scala:420']]},
+    r:          {label:'r',          path:'R/',              rows:[[47,22,'fit_model','model.R:210'],[31,16,'reshape_long','reshape.R:88'],[19,11,'parse_formula','formula.R:44']]},
+    perl:       {label:'perl',       path:'lib/',            rows:[[65,28,'request','http.pm:126'],[42,21,'parse_head','Parser.pm:310'],[26,15,'ftp_request','ftp.pm:126']]},
+    matlab:     {label:'matlab',     path:'.',               rows:[[72,30,'tb_optparse','tb_optparse.m:106'],[53,26,'arrow3','arrow3.m:1'],[31,17,'print2eps','print2eps.m:1']]}
+  };
+  var C1=11, C2=12, C3=21;
+  function pad(s,n){ s=String(s); while(s.length<n){ s+=' '; } return s; }
+  var termOut = document.getElementById('termout');
+  var termTitle = document.getElementById('term-title');
+  function renderExample(lang){
+    var e = EXAMPLES[lang]; if(!e){ return; }
+    var out = '<span class="pr">$</span> <span class="cmd">codemetrics --top 3 ' + e.path + '</span>\n';
+    out += '<span class="hd">' + pad('COGNITIVE',C1) + pad('CYCLOMATIC',C2) + pad('FUNCTION',C3) + 'LOCATION</span>\n';
+    e.rows.forEach(function(r){
+      out += '<span class="n">' + pad(r[0],C1) + '</span>' + pad(r[1],C2) +
+             '<span class="fn">' + pad(r[2],C3) + '</span><span class="loc">' + r[3] + '</span>\n';
+    });
+    out += '<span class="warn">codemetrics: ' + e.rows.length + ' finding(s)</span>';
+    termOut.innerHTML = out;
+    termTitle.textContent = 'codemetrics — ' + e.label;
+  }
+  document.querySelectorAll('.lang[data-lang]').forEach(function(pill){
+    pill.addEventListener('click', function(){
+      document.querySelectorAll('.lang[data-lang]').forEach(function(p){ p.setAttribute('aria-selected','false'); });
+      pill.setAttribute('aria-selected','true');
+      renderExample(pill.dataset.lang);
+    });
+  });
+  // Canonical render of the default-selected language (keeps markup + JS in sync).
+  renderExample((document.querySelector('.lang[aria-selected="true"]') || {}).dataset ? document.querySelector('.lang[aria-selected="true"]').dataset.lang : 'python');
   document.querySelectorAll('.copy').forEach(function(b){
     b.addEventListener('click', function(){
       var el = document.getElementById(b.dataset.t);
