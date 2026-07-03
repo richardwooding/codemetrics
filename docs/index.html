@@ -174,7 +174,7 @@
     <div>
       <p class="eyebrow">cyclomatic + cognitive · 17 languages</p>
       <h1>Complexity that <span class="grad">gates your PRs.</span></h1>
-      <p class="sub">Per-function <b>cyclomatic</b> and <b>cognitive</b> complexity in one pass — a CLI and GitHub Action that fail a pull request when the code it touches gets too gnarly. Plus a zero-dependency Go library.</p>
+      <p class="sub">Per-function <b>cyclomatic</b> and <b>cognitive</b> complexity in one pass — a CLI and GitHub Action that fail a pull request when the code it touches gets too gnarly. Plus a Go library whose core needs nothing but the standard library.</p>
       <div class="cta">
         <a class="btn primary" href="#install">Get started</a>
         <a class="btn ghost" href="https://github.com/richardwooding/codemetrics">View on GitHub</a>
@@ -244,7 +244,7 @@
       <div class="card"><h3><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h10"/></svg></span>Baseline</h3><p>Adopt on legacy code without a big-bang cleanup: record a baseline and fail only on <i>new</i> complexity.</p></div>
       <div class="card"><h3><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5L20 7"/></svg></span>Suppression</h3><p>Opt a function out with <code>//gocyclo:ignore</code>, <code>//nolint</code>, or <code>codemetrics:ignore</code> — gocyclo/gocognit-compatible.</p></div>
       <div class="card"><h3><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><path d="M4 9h16"/></svg></span>GitHub Action</h3><p>Drop the Marketplace action into a workflow and every PR is gated — no runner setup, no Docker.</p></div>
-      <div class="card"><h3><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/></svg></span>Zero-dep library</h3><p>The Go module root is <code>go/ast</code>-only and pulls in nothing — embed it without dragging in tree-sitter.</p></div>
+      <div class="card"><h3><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/></svg></span>Stdlib-only core</h3><p>The root library package imports only <code>go/ast</code>, so embedding it compiles no third-party code. Tree-sitter and the CLI's deps are opt-in.</p></div>
       <div class="card"><h3><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/></svg></span>Skips the noise</h3><p>Vendored and minified files (bundled libs, <code>*.min.js</code>) are skipped by default, powered by <code>projectdetect</code>.</p></div>
     </div>
   </div>
