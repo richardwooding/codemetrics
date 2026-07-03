@@ -86,12 +86,22 @@ runs:
         CM_FAIL: ${{ inputs.fail-on-findings }}
       run: |
         set -euo pipefail
+        if ! command -v codemetrics >/dev/null 2>&1; then
+          echo "::error::codemetrics not found on PATH — the install step did not complete successfully" >&2
+          exit 1
+        fi
+
         base="${CM_BASE:-}"
         if [ -z "$base" ]; then base="$CM_DEFAULT_BRANCH"; fi
         echo "Diffing against origin/${base}"
 
-        # The caller must checkout with fetch-depth: 0 so HEAD and the base
-        # share history for the merge-base; fetch the base tip to be safe.
+        # The diff's merge-base needs shared history between HEAD and the base,
+        # so a shallow clone (actions/checkout's default) won't work.
+        if [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
+          echo "::error::Shallow clone detected. Set 'fetch-depth: 0' on actions/checkout so codemetrics can find the diff merge-base." >&2
+          exit 1
+        fi
+        # Fetch the base tip to be safe (it may not be present locally).
         git fetch --no-tags --quiet origin "$base"
 
         args=( --diff "origin/${base}...HEAD" )
@@ -105,6 +115,7 @@ runs:
         codemetrics "${args[@]}" "${paths[@]}" || code=$?
 
         if [ -n "${CM_SARIF:-}" ]; then
+          mkdir -p "$(dirname "$CM_SARIF")"
           codemetrics "${args[@]}" --format sarif "${paths[@]}" > "$CM_SARIF" || true
           echo "Wrote SARIF to ${CM_SARIF}"
         fi
