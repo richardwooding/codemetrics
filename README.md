@@ -182,6 +182,32 @@ A GitHub Actions step that uploads the SARIF:
 Quality-gate flags: `--max-cognitive N`, `--max-cyclomatic N` (0 = disabled),
 `--baseline FILE`, `--write-baseline FILE`.
 
+### PR mode: gate only what changed
+
+`--diff <ref>` restricts the whole run to functions **touched by a git diff**, so
+a pull request is judged only on the code it actually changes — not the
+pre-existing tree. It parses `git diff <ref>` and keeps a function only when its
+line span overlaps a changed (new-side) line, then applies your thresholds to
+that subset.
+
+```sh
+# Fail the PR only if a function it touches is too complex
+codemetrics --diff origin/main...HEAD --max-cognitive 15 .
+```
+
+`<ref>` is passed straight to `git diff`, so use whatever expresses "this PR":
+`origin/main...HEAD` (changes since the merge base — the usual PR diff),
+`origin/main`, or `HEAD~1`. Added files count in full; modified files count only
+their changed regions. Combine with `--format sarif` to upload PR-scoped
+findings, or with `--baseline` to also suppress known offenders among them.
+
+A GitHub Actions PR gate:
+
+```yaml
+- run: git fetch origin ${{ github.base_ref }}
+- run: codemetrics --diff origin/${{ github.base_ref }}...HEAD --max-cognitive 15 .
+```
+
 > The CLI embeds the tree-sitter grammars (~22 MB binary). The **library**
 > packages stay dependency-light — this weight lives only in the `codemetrics`
 > command.

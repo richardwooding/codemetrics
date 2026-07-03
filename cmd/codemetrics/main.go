@@ -36,6 +36,8 @@ type CLI struct {
 	Format string `short:"f" help:"Output format: table, json, or sarif." enum:"table,json,sarif" default:"table"`
 	Lang   string `help:"Force a language id for all inputs instead of detecting by extension (also sets the language for stdin)."`
 
+	Diff string `help:"PR mode: only consider functions touched by 'git diff <ref>' (e.g. origin/main...HEAD). Filters display and gate to changed code."`
+
 	MaxCognitive  int `help:"Flag functions whose cognitive complexity exceeds this (0 = disabled)."`
 	MaxCyclomatic int `help:"Flag functions whose cyclomatic complexity exceeds this (0 = disabled)."`
 
@@ -66,6 +68,16 @@ func run(cli CLI) (int, error) {
 	rows, err := collect(cli.Paths, cli.Lang)
 	if err != nil {
 		return 1, err
+	}
+
+	// PR mode: restrict everything downstream to functions the diff touches, so
+	// only findings actually in the change are reported and gated.
+	if cli.Diff != "" {
+		changed, err := changedLines(cli.Diff)
+		if err != nil {
+			return 1, err
+		}
+		rows = filterToDiff(rows, changed)
 	}
 
 	sortRows(rows, cli.Sort)
