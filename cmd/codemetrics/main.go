@@ -36,6 +36,7 @@ type CLI struct {
 	Top    int    `help:"Show only the top N rows (0 = all)."`
 	Min    int    `help:"Only show functions whose sort metric is >= this."`
 	Format string `short:"f" help:"Output format: table, json, or sarif." enum:"table,json,sarif" default:"table"`
+	Color  string `help:"When to colorize the table: auto (TTY only, honors NO_COLOR), always, or never." enum:"auto,always,never" default:"auto"`
 	Lang   string `help:"Force a language id for all inputs instead of detecting by extension (also sets the language for stdin)."`
 
 	Diff string `help:"PR mode: only consider functions touched by 'git diff <ref>' (e.g. origin/main...HEAD). Filters display and gate to changed code."`
@@ -126,15 +127,17 @@ func run(cli CLI) (int, error) {
 			return 1, err
 		}
 	default:
-		printTable(os.Stdout, display)
+		printTable(os.Stdout, display, newPalette(os.Stdout, cli.Color))
 	}
 
 	if gateActive {
+		var msg string
 		if cli.Baseline != "" {
-			fmt.Fprintf(os.Stderr, "codemetrics: %d new finding(s), %d suppressed by baseline\n", len(active), len(findings)-len(active))
+			msg = fmt.Sprintf("codemetrics: %d new finding(s), %d suppressed by baseline", len(active), len(findings)-len(active))
 		} else {
-			fmt.Fprintf(os.Stderr, "codemetrics: %d finding(s)\n", len(active))
+			msg = fmt.Sprintf("codemetrics: %d finding(s)", len(active))
 		}
+		fmt.Fprintln(os.Stderr, newPalette(os.Stderr, cli.Color).warn(msg))
 		if len(active) > 0 {
 			return 1, nil
 		}

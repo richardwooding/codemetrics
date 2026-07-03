@@ -2,11 +2,10 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"sort"
+	"strconv"
 	"strings"
-	"text/tabwriter"
 )
 
 // metricOf returns the value a row is ranked/filtered by. Cyclomatic is used
@@ -57,22 +56,78 @@ func emitJSON(w io.Writer, rows []row) error {
 	return enc.Encode(rows)
 }
 
-func printTable(w io.Writer, rows []row) {
-	tw := tabwriter.NewWriter(w, 0, 4, 2, ' ', 0)
-	_, _ = fmt.Fprintln(tw, "COGNITIVE\tCYCLOMATIC\tLINES\tFUNCTION\tLOCATION")
+// printTable renders rows as an aligned table, optionally colorized via pal.
+// Columns are padded manually (not text/tabwriter) because tabwriter counts the
+// bytes of ANSI escape sequences as visible width and would misalign colored
+// cells. Widths are measured from the uncolored text; color is applied on top.
+func printTable(w io.Writer, rows []row, pal palette) {
+	const gap = 2
+	heads := []string{"COGNITIVE", "CYCLOMATIC", "LINES", "FUNCTION", "LOCATION"}
+
+	// cell holds a column's plain text (for width) and its display form (colored).
+	type cell struct{ plain, shown string }
+	data := make([][]cell, 0, len(rows))
 	for _, r := range rows {
 		cog := "-"
 		if r.Cognitive != nil {
-			cog = fmt.Sprintf("%d", *r.Cognitive)
+			cog = strconv.Itoa(*r.Cognitive)
 		}
-		lines := r.EndLine - r.StartLine + 1
-		fn := r.Function
+		fnPlain, fnShown := r.Function, r.Function
 		if len(r.Ignored) > 0 {
 			// Show why an over-threshold function won't gate (short metric names).
 			short := strings.NewReplacer(ruleCognitive, "cognitive", ruleCyclomatic, "cyclomatic").Replace(strings.Join(r.Ignored, ","))
-			fn += " (ignored: " + short + ")"
+			cue := " (ignored: " + short + ")"
+			fnPlain += cue
+			fnShown += pal.muted(cue)
 		}
-		_, _ = fmt.Fprintf(tw, "%s\t%d\t%d\t%s\t%s:%d\n", cog, r.Cyclomatic, lines, fn, r.File, r.StartLine)
+		loc := r.File + ":" + strconv.Itoa(r.StartLine)
+		cyc := strconv.Itoa(r.Cyclomatic)
+		lines := strconv.Itoa(r.EndLine - r.StartLine + 1)
+		data = append(data, []cell{
+			{cog, pal.cognitive(cog)},
+			{cyc, cyc},
+			{lines, lines},
+			{fnPlain, fnShown},
+			{loc, pal.location(loc)},
+		})
 	}
-	_ = tw.Flush()
+
+	widths := make([]int, len(heads))
+	for i, h := range heads {
+		widths[i] = len(h)
+	}
+	for _, cells := range data {
+		for i, c := range cells {
+			if len(c.plain) > widths[i] {
+				widths[i] = len(c.plain)
+			}
+		}
+	}
+
+	var b strings.Builder
+	writeRow := func(plains, showns []string) {
+		for i := range plains {
+			b.WriteString(showns[i])
+			if i < len(plains)-1 { // no trailing padding on the last column
+				b.WriteString(strings.Repeat(" ", widths[i]-len(plains[i])+gap))
+			}
+		}
+		b.WriteByte('\n')
+	}
+	hp := make([]string, len(heads))
+	hs := make([]string, len(heads))
+	for i, h := range heads {
+		hp[i] = h
+		hs[i] = pal.header(h)
+	}
+	writeRow(hp, hs)
+	for _, cells := range data {
+		p := make([]string, len(cells))
+		s := make([]string, len(cells))
+		for i, c := range cells {
+			p[i], s[i] = c.plain, c.shown
+		}
+		writeRow(p, s)
+	}
+	_, _ = io.WriteString(w, b.String())
 }

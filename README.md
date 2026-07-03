@@ -158,6 +158,10 @@ them anyway. (Explicitly-named files and stdin are always analyzed.)
 Flags: `--sort cognitive|cyclomatic`, `--top N`, `--min N`,
 `--format table|json|sarif`, `--lang <id>`, plus the quality-gate flags below.
 
+The table is colorized when writing to a terminal and plain when redirected to a
+file or pipe. Color honors [`NO_COLOR`](https://no-color.org); force it either
+way with `--color always|never` (default `auto`).
+
 > **Flag style changed.** The CLI now uses GNU-style double-dash flags
 > (`--sort`, `--top`, `--min`) and `--json` is replaced by `--format json`.
 
