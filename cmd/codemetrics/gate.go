@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"sort"
 
 	sarif "github.com/richardwooding/go-sarif"
@@ -44,17 +45,19 @@ func (f finding) metricName() string {
 
 // computeFindings derives findings from rows for whichever thresholds are
 // enabled (a zero threshold disables that rule). A single function can produce
-// both a cognitive and a cyclomatic finding.
+// both a cognitive and a cyclomatic finding. A function carrying a suppression
+// directive (row.Ignored) yields no finding for the suppressed metric — it
+// still appears in the display, but never gates.
 func computeFindings(rows []row, maxCog, maxCyc int) []finding {
 	var out []finding
 	for _, r := range rows {
-		if maxCog > 0 && r.Cognitive != nil && *r.Cognitive > maxCog {
+		if maxCog > 0 && r.Cognitive != nil && *r.Cognitive > maxCog && !slices.Contains(r.Ignored, ruleCognitive) {
 			out = append(out, finding{
 				Rule: ruleCognitive, File: r.File, Function: r.Function,
 				Value: *r.Cognitive, Threshold: maxCog, StartLine: r.StartLine, EndLine: r.EndLine,
 			})
 		}
-		if maxCyc > 0 && r.Cyclomatic > maxCyc {
+		if maxCyc > 0 && r.Cyclomatic > maxCyc && !slices.Contains(r.Ignored, ruleCyclomatic) {
 			out = append(out, finding{
 				Rule: ruleCyclomatic, File: r.File, Function: r.Function,
 				Value: r.Cyclomatic, Threshold: maxCyc, StartLine: r.StartLine, EndLine: r.EndLine,

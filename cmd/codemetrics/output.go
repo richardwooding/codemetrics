@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"strings"
 	"text/tabwriter"
 )
 
@@ -65,7 +66,13 @@ func printTable(w io.Writer, rows []row) {
 			cog = fmt.Sprintf("%d", *r.Cognitive)
 		}
 		lines := r.EndLine - r.StartLine + 1
-		_, _ = fmt.Fprintf(tw, "%s\t%d\t%d\t%s\t%s:%d\n", cog, r.Cyclomatic, lines, r.Function, r.File, r.StartLine)
+		fn := r.Function
+		if len(r.Ignored) > 0 {
+			// Show why an over-threshold function won't gate (short metric names).
+			short := strings.NewReplacer(ruleCognitive, "cognitive", ruleCyclomatic, "cyclomatic").Replace(strings.Join(r.Ignored, ","))
+			fn += " (ignored: " + short + ")"
+		}
+		_, _ = fmt.Fprintf(tw, "%s\t%d\t%d\t%s\t%s:%d\n", cog, r.Cyclomatic, lines, fn, r.File, r.StartLine)
 	}
 	_ = tw.Flush()
 }

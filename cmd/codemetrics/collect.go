@@ -17,12 +17,13 @@ import (
 
 // row is one analyzed function.
 type row struct {
-	File       string `json:"file"`
-	Function   string `json:"function"`
-	Cyclomatic int    `json:"cyclomatic"`
-	Cognitive  *int   `json:"cognitive,omitempty"`
-	StartLine  int    `json:"start_line"`
-	EndLine    int    `json:"end_line"`
+	File       string   `json:"file"`
+	Function   string   `json:"function"`
+	Cyclomatic int      `json:"cyclomatic"`
+	Cognitive  *int     `json:"cognitive,omitempty"`
+	StartLine  int      `json:"start_line"`
+	EndLine    int      `json:"end_line"`
+	Ignored    []string `json:"ignored,omitempty"` // rule ids suppressed by a directive
 }
 
 // collect analyzes every source named by args (files, directories, or stdin
@@ -150,6 +151,7 @@ func rowsFor(name, lang string, src []byte) ([]row, error) {
 		}
 		return nil, fmt.Errorf("%s: %w", name, err)
 	}
+	lines := strings.Split(string(src), "\n")
 	out := make([]row, 0, len(fns))
 	for _, f := range fns {
 		out = append(out, row{
@@ -159,6 +161,7 @@ func rowsFor(name, lang string, src []byte) ([]row, error) {
 			Cognitive:  f.Cognitive,
 			StartLine:  f.StartLine,
 			EndLine:    f.EndLine,
+			Ignored:    ignoredMetrics(lines, lang, f.StartLine),
 		})
 	}
 	return out, nil
