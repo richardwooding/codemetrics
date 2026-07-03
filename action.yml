@@ -28,7 +28,7 @@ inputs:
     description: "Fail the job when new findings remain in the diff (true/false)."
     default: "true"
   codemetrics-version:
-    description: 'go-codemetrics release to install (e.g. "v0.7.0") or "latest".'
+    description: 'codemetrics release to install (e.g. "v0.7.0") or "latest".'
     default: "latest"
   github-token:
     description: "Token used to download the release binary."
@@ -46,7 +46,7 @@ runs:
         set -euo pipefail
         version="$CM_VERSION"
         if [ "$version" = "latest" ]; then
-          version="$(gh release view --repo richardwooding/go-codemetrics --json tagName -q .tagName)"
+          version="$(gh release view --repo richardwooding/codemetrics --json tagName -q .tagName)"
         fi
         ver="${version#v}"
 
@@ -64,7 +64,7 @@ runs:
         asset="codemetrics_${ver}_${goos}_${goarch}.tar.gz"
         echo "Installing codemetrics ${version} (${asset})"
         tmp="$(mktemp -d)"
-        gh release download "$version" --repo richardwooding/go-codemetrics --pattern "$asset" --output "$tmp/cm.tar.gz"
+        gh release download "$version" --repo richardwooding/codemetrics --pattern "$asset" --output "$tmp/cm.tar.gz"
         tar -xzf "$tmp/cm.tar.gz" -C "$tmp"
 
         bindir="$HOME/.codemetrics-bin"

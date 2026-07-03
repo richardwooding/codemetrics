@@ -1,4 +1,4 @@
-module github.com/richardwooding/go-codemetrics
+module github.com/richardwooding/codemetrics
 
 go 1.26.2
 

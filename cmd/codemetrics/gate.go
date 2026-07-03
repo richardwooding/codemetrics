@@ -132,7 +132,7 @@ func emitSARIF(w io.Writer, findings []finding, maxCog, maxCyc int) error {
 	tool := sarif.Tool{
 		Name:           "codemetrics",
 		Version:        version,
-		InformationURI: "https://github.com/richardwooding/go-codemetrics",
+		InformationURI: "https://github.com/richardwooding/codemetrics",
 	}
 	var rules []sarif.Rule
 	if maxCog > 0 {

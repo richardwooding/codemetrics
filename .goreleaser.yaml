@@ -73,7 +73,7 @@ homebrew_casks:
       owner: richardwooding
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
-    homepage: "https://github.com/richardwooding/go-codemetrics"
+    homepage: "https://github.com/richardwooding/codemetrics"
     description: "Per-function cyclomatic and cognitive complexity with SARIF output and a baseline quality gate"
     # The released binary is unsigned/un-notarized, so macOS Gatekeeper marks it
     # with a quarantine attribute that blocks it on first run. Strip it on
@@ -86,4 +86,4 @@ homebrew_casks:
 release:
   github:
     owner: richardwooding
-    name: go-codemetrics
+    name: codemetrics
