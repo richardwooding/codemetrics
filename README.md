@@ -147,7 +147,11 @@ COGNITIVE  CYCLOMATIC  LINES  FUNCTION            LOCATION
 Directories are walked recursively, skipping dot-directories, `testdata`, and
 each detected project's build-artefact dirs (`vendor`, `node_modules`,
 `target`, `__pycache__`, …, resolved by `projectdetect`). Files whose extension
-maps to no supported language are ignored.
+maps to no supported language are ignored. **Vendored and minified files**
+(bundled libraries, `*.min.js`, and content that looks minified — via
+[`projectdetect`][projectdetect]) are skipped too, so a stray `jquery.min.js`
+under `docs/` doesn't pollute the report; pass `--include-vendored` to analyze
+them anyway. (Explicitly-named files and stdin are always analyzed.)
 
 Flags: `--sort cognitive|cyclomatic`, `--top N`, `--min N`,
 `--format table|json|sarif`, `--lang <id>`, plus the quality-gate flags below.

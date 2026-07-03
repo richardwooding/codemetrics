@@ -27,8 +27,10 @@ type row struct {
 
 // collect analyzes every source named by args (files, directories, or stdin
 // when empty) and returns one row per function. forceLang, when non-empty,
-// overrides per-file extension detection for every input.
-func collect(args []string, forceLang string) ([]row, error) {
+// overrides per-file extension detection for every input. When skipVendored is
+// set, vendored/minified files are skipped during directory walks (explicitly
+// named files and stdin are always analyzed — you asked for them).
+func collect(args []string, forceLang string, skipVendored bool) ([]row, error) {
 	if len(args) == 0 {
 		src, err := io.ReadAll(os.Stdin)
 		if err != nil {
@@ -47,7 +49,7 @@ func collect(args []string, forceLang string) ([]row, error) {
 			return nil, err
 		}
 		if info.IsDir() {
-			r, err := collectDir(arg, forceLang)
+			r, err := collectDir(arg, forceLang, skipVendored)
 			if err != nil {
 				return nil, err
 			}
@@ -70,7 +72,9 @@ func collect(args []string, forceLang string) ([]row, error) {
 // collectDir walks root recursively. Build-artefact directories come from
 // projectdetect (vendor, node_modules, target, __pycache__, …); dot-directories
 // and testdata are skipped too. Only files with a recognised language are read.
-func collectDir(root, forceLang string) ([]row, error) {
+// When skipVendored is set, vendored/minified files (bundled libraries, *.min.js,
+// content that looks minified) are skipped via projectdetect.
+func collectDir(root, forceLang string, skipVendored bool) ([]row, error) {
 	excludes := map[string]struct{}{}
 	if ex, err := projectdetect.CollectBuildExcludes(context.Background(), root); err == nil {
 		for _, e := range ex {
@@ -99,7 +103,17 @@ func collectDir(root, forceLang string) ([]row, error) {
 		if lang == "" {
 			return nil
 		}
-		r, ferr := rowsForFile(path, lang)
+		if skipVendored && projectdetect.IsVendored(path) {
+			return nil // bundled library / minified asset by path
+		}
+		src, rerr := os.ReadFile(path)
+		if rerr != nil {
+			return rerr
+		}
+		if skipVendored && projectdetect.IsMinified(src) {
+			return nil // minified bundle with no telltale name
+		}
+		r, ferr := rowsFor(path, lang, src)
 		if ferr != nil {
 			return ferr
 		}

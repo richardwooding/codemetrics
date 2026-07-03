@@ -40,6 +40,8 @@ type CLI struct {
 
 	Diff string `help:"PR mode: only consider functions touched by 'git diff <ref>' (e.g. origin/main...HEAD). Filters display and gate to changed code."`
 
+	IncludeVendored bool `help:"Analyze vendored/minified files too. By default they are skipped in directory walks (node_modules, *.min.js, bundled libraries, minified content)."`
+
 	MaxCognitive  int `help:"Flag functions whose cognitive complexity exceeds this (0 = disabled)."`
 	MaxCyclomatic int `help:"Flag functions whose cyclomatic complexity exceeds this (0 = disabled)."`
 
@@ -68,7 +70,7 @@ func main() {
 // run executes the CLI and returns a process exit code. The gate exits 1 only
 // when thresholds are set and at least one non-suppressed finding remains.
 func run(cli CLI) (int, error) {
-	rows, err := collect(cli.Paths, cli.Lang)
+	rows, err := collect(cli.Paths, cli.Lang, !cli.IncludeVendored)
 	if err != nil {
 		return 1, err
 	}
