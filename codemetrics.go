@@ -21,8 +21,9 @@ type FunctionMetrics struct {
 	Receiver string
 	// Cyclomatic is the McCabe cyclomatic complexity (1 + branch points).
 	Cyclomatic int
-	// Cognitive is the SonarSource cognitive complexity, or nil when the
-	// language's analyzer does not compute it. For Go it is always set.
+	// Cognitive is the SonarSource cognitive complexity. It is a pointer so a
+	// language whose analyzer computes no cognitive score is distinguishable
+	// (nil) from a genuine zero; every language supported today populates it.
 	Cognitive *int
 	// StartLine and EndLine are the 1-based inclusive line span of the
 	// function declaration.
