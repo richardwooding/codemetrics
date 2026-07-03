@@ -2,8 +2,9 @@
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/richardwooding/go-codemetrics.svg)](https://pkg.go.dev/github.com/richardwooding/go-codemetrics)
 
-Per-function **cyclomatic** and **cognitive** complexity for source code, as a
-small Go library and CLI.
+Per-function **cyclomatic** and **cognitive** complexity for source code — a
+**CLI** and **GitHub Action** that gate pull requests on complexity, plus a
+small **Go library**.
 
 Most Go tools give you one metric or the other: [`fzipp/gocyclo`][gocyclo] does
 cyclomatic, [`uudashr/gocognit`][gocognit] does cognitive. `go-codemetrics`
@@ -26,10 +27,6 @@ dependencies**.
 
 ## Install
 
-```sh
-go get github.com/richardwooding/go-codemetrics
-```
-
 CLI — Homebrew (macOS):
 
 ```sh
@@ -47,74 +44,57 @@ CLI — `go install` (any platform), or download a binary from the
 go install github.com/richardwooding/go-codemetrics/cmd/codemetrics@latest
 ```
 
-## Library usage
+Library:
 
-```go
-package main
-
-import (
-	"fmt"
-
-	codemetrics "github.com/richardwooding/go-codemetrics"
-)
-
-func main() {
-	src := []byte(`package p
-func classify(n int) string {
-	if n < 0 {
-		return "neg"
-	} else if n == 0 {
-		return "zero"
-	}
-	return "pos"
-}`)
-
-	fns, err := codemetrics.ParseGo(src)
-	if err != nil {
-		panic(err)
-	}
-	for _, f := range fns {
-		fmt.Printf("%-12s cyclomatic=%d cognitive=%d lines=%d\n",
-			f.QualifiedName(), f.Cyclomatic, *f.Cognitive, f.Lines())
-	}
-	// classify     cyclomatic=3 cognitive=2 lines=8
-}
+```sh
+go get github.com/richardwooding/go-codemetrics
 ```
 
-`Parse(language, src)` dispatches by language identifier (`"go"` / `"golang"`
-today) and returns a wrapped `ErrUnsupportedLanguage` for anything else.
-`SupportedLanguages()` lists what's available.
+## GitHub Action (PR complexity gate)
 
-```go
-type FunctionMetrics struct {
-	Name       string // bare name, e.g. "Write"
-	Receiver   string // receiver type for methods, e.g. "*Buffer"; "" otherwise
-	Cyclomatic int
-	Cognitive  *int   // nil if unavailable for the language; always set for Go
-	StartLine  int    // 1-based, inclusive
-	EndLine    int
-}
+This repo ships a composite Action that runs the `--diff` gate on pull requests:
+it installs the released `codemetrics` binary and fails the check when a function
+the PR **touches** exceeds your threshold. No Docker image — it just downloads
+the binary for the runner.
+
+```yaml
+name: complexity
+on: pull_request
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # required: full history for the diff's merge-base
+      - uses: richardwooding/go-codemetrics@v0.7.1
+        with:
+          max-cognitive: "15"
 ```
 
-`Cognitive` is a pointer so a language without cognitive support is
-distinguishable (`nil`) from a genuine zero. For Go it is always populated.
+Optionally upload SARIF so findings show up in the PR's Files-changed view:
 
-### Already have an AST?
-
-If you've already parsed Go source with `go/parser`, compute either metric for
-a single declaration without re-parsing:
-
-```go
-func Cyclomatic(body *ast.BlockStmt) int // 1 + branch points
-func Cognitive(fn *ast.FuncDecl) int     // SonarSource cognitive complexity
+```yaml
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: richardwooding/go-codemetrics@v0.7.1
+        with:
+          max-cognitive: "15"
+          sarif-file: codemetrics.sarif
+      - if: always() # upload even when the gate fails
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: codemetrics.sarif
+    permissions:
+      contents: read
+      security-events: write # needed for the SARIF upload
 ```
 
-Both are nil-safe (return 0). This mirrors the AST-level entry points of
-[`gocyclo`][gocyclo] and [`gocognit`][gocognit].
-
-Parsing is best-effort: input that still yields a partial syntax tree is
-tolerated and metrics are computed for every recovered function; only a total
-parse failure returns an error.
+**Inputs:** `paths` (default `.`), `max-cognitive` (default `15`),
+`max-cyclomatic` (default `0`), `base-ref` (default the PR base branch),
+`baseline`, `sarif-file`, `fail-on-findings` (default `true`),
+`codemetrics-version` (default `latest`). Runs on Linux and macOS runners.
 
 ## CLI usage
 
@@ -212,7 +192,7 @@ codemetrics --diff origin/main...HEAD --max-cognitive 15 .
 their changed regions. Combine with `--format sarif` to upload PR-scoped
 findings, or with `--baseline` to also suppress known offenders among them.
 
-On GitHub, the [Action](#github-action-pr-complexity-gate) below wires this up
+On GitHub, the [Action](#github-action-pr-complexity-gate) above wires this up
 for you; to run the CLI directly in a workflow instead:
 
 ```yaml
@@ -224,51 +204,74 @@ for you; to run the CLI directly in a workflow instead:
 > packages stay dependency-light — this weight lives only in the `codemetrics`
 > command.
 
-## GitHub Action (PR complexity gate)
+## Library usage
 
-This repo ships a composite Action that runs the `--diff` gate on pull requests:
-it installs the released `codemetrics` binary and fails the check when a function
-the PR **touches** exceeds your threshold. No Docker image — it just downloads
-the binary for the runner.
+```go
+package main
 
-```yaml
-name: complexity
-on: pull_request
-jobs:
-  gate:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # required: full history for the diff's merge-base
-      - uses: richardwooding/go-codemetrics@v0.7.0
-        with:
-          max-cognitive: "15"
+import (
+	"fmt"
+
+	codemetrics "github.com/richardwooding/go-codemetrics"
+)
+
+func main() {
+	src := []byte(`package p
+func classify(n int) string {
+	if n < 0 {
+		return "neg"
+	} else if n == 0 {
+		return "zero"
+	}
+	return "pos"
+}`)
+
+	fns, err := codemetrics.ParseGo(src)
+	if err != nil {
+		panic(err)
+	}
+	for _, f := range fns {
+		fmt.Printf("%-12s cyclomatic=%d cognitive=%d lines=%d\n",
+			f.QualifiedName(), f.Cyclomatic, *f.Cognitive, f.Lines())
+	}
+	// classify     cyclomatic=3 cognitive=2 lines=8
+}
 ```
 
-Optionally upload SARIF so findings show up in the PR's Files-changed view:
+`Parse(language, src)` dispatches by language identifier (`"go"` / `"golang"`
+today) and returns a wrapped `ErrUnsupportedLanguage` for anything else.
+`SupportedLanguages()` lists what's available.
 
-```yaml
-    steps:
-      - uses: actions/checkout@v4
-        with: { fetch-depth: 0 }
-      - uses: richardwooding/go-codemetrics@v0.7.0
-        with:
-          max-cognitive: "15"
-          sarif-file: codemetrics.sarif
-      - if: always() # upload even when the gate fails
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: codemetrics.sarif
-    permissions:
-      contents: read
-      security-events: write # needed for the SARIF upload
+```go
+type FunctionMetrics struct {
+	Name       string // bare name, e.g. "Write"
+	Receiver   string // receiver type for methods, e.g. "*Buffer"; "" otherwise
+	Cyclomatic int
+	Cognitive  *int   // nil if unavailable for the language; always set for Go
+	StartLine  int    // 1-based, inclusive
+	EndLine    int
+}
 ```
 
-**Inputs:** `paths` (default `.`), `max-cognitive` (default `15`),
-`max-cyclomatic` (default `0`), `base-ref` (default the PR base branch),
-`baseline`, `sarif-file`, `fail-on-findings` (default `true`),
-`codemetrics-version` (default `latest`). Runs on Linux and macOS runners.
+`Cognitive` is a pointer so a language without cognitive support is
+distinguishable (`nil`) from a genuine zero. For Go it is always populated.
+
+### Already have an AST?
+
+If you've already parsed Go source with `go/parser`, compute either metric for
+a single declaration without re-parsing:
+
+```go
+func Cyclomatic(body *ast.BlockStmt) int // 1 + branch points
+func Cognitive(fn *ast.FuncDecl) int     // SonarSource cognitive complexity
+```
+
+Both are nil-safe (return 0). This mirrors the AST-level entry points of
+[`gocyclo`][gocyclo] and [`gocognit`][gocognit].
+
+Parsing is best-effort: input that still yields a partial syntax tree is
+tolerated and metrics are computed for every recovered function; only a total
+parse failure returns an error.
 
 ## Other languages (tree-sitter)
 
