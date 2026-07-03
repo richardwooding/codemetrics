@@ -196,6 +196,40 @@ A GitHub Actions step that uploads the SARIF:
 Quality-gate flags: `--max-cognitive N`, `--max-cyclomatic N` (0 = disabled),
 `--baseline FILE`, `--write-baseline FILE`.
 
+### Ignoring a function
+
+Opt an intentionally-complex function out of the gate with a comment directive —
+codemetrics honours the ones you may already use with `gocyclo` / `gocognit` /
+golangci-lint, plus its own cross-language `codemetrics:ignore`. Put the
+directive on the line directly above the function (or trailing its declaration):
+
+```go
+//gocyclo:ignore
+func bigStateMachine() { … }      // won't fail the gate
+
+//nolint:gocognit
+func alsoFine() { … }
+```
+
+```python
+# codemetrics:ignore
+def parser(): ...                 # any language, native comment syntax
+```
+
+| Directive | Suppresses | Languages |
+|-----------|-----------|-----------|
+| `codemetrics:ignore` | both metrics | all |
+| `codemetrics:ignore cognitive` / `cyclomatic` | the named metric(s) | all |
+| `gocyclo:ignore` | both metrics | Go |
+| `nolint` / `nolint:all` | both metrics | Go |
+| `nolint:gocyclo` / `nolint:gocognit` | cyclomatic / cognitive | Go |
+
+An ignored function **still appears** in the table/JSON with its metrics (marked
+`(ignored: …)`), but produces no finding — so it never fails the gate, lands in
+SARIF, or enters a baseline. The metric **libraries** are unchanged and still
+match [`gocyclo`][gocyclo] / [`gocognit`][gocognit]; the directive is applied by
+the CLI, exactly as those tools do.
+
 ### PR mode: gate only what changed
 
 `--diff <ref>` restricts the whole run to functions **touched by a git diff**, so
