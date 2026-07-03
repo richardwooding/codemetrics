@@ -30,7 +30,18 @@ dependencies**.
 go get github.com/richardwooding/go-codemetrics
 ```
 
-CLI:
+CLI — Homebrew (macOS):
+
+```sh
+brew install --cask richardwooding/tap/codemetrics
+```
+
+The cask installs a pre-built binary. Since it isn't notarized, the cask strips
+the macOS quarantine attribute on install so it runs without a Gatekeeper
+prompt.
+
+CLI — `go install` (any platform), or download a binary from the
+[releases page](https://github.com/richardwooding/go-codemetrics/releases):
 
 ```sh
 go install github.com/richardwooding/go-codemetrics/cmd/codemetrics@latest

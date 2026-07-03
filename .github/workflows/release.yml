@@ -1,0 +1,27 @@
+name: release
+on:
+  push:
+    tags:
+      - "v*"
+permissions:
+  contents: write # create the GitHub release and upload artifacts
+jobs:
+  goreleaser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # full history so the changelog can be generated
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # PAT with contents:write on richardwooding/homebrew-tap so the cask
+          # can be pushed cross-repo (the default GITHUB_TOKEN can't).
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}

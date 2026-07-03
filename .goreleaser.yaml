@@ -1,0 +1,89 @@
+# GoReleaser configuration for the codemetrics CLI.
+# Docs: https://goreleaser.com
+version: 2
+
+project_name: codemetrics
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: codemetrics
+    main: ./cmd/codemetrics
+    binary: codemetrics
+    env:
+      - CGO_ENABLED=0 # gotreesitter is pure Go, so grammars embed with no cgo
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - id: archives
+    ids:
+      - codemetrics
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "^ci:"
+      - "Merge pull request"
+      - "Merge branch"
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\(.+\))??!?:.+$'
+      order: 0
+    - title: Bug fixes
+      regexp: '^.*?fix(\(.+\))??!?:.+$'
+      order: 1
+    - title: Others
+      order: 999
+
+# Homebrew Cask (macOS). Casks are macOS-only, so only the darwin artifacts are
+# used; Linux/Windows users take the archives from the GitHub release.
+homebrew_casks:
+  - name: codemetrics
+    binaries:
+      - codemetrics
+    repository:
+      owner: richardwooding
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    homepage: "https://github.com/richardwooding/go-codemetrics"
+    description: "Per-function cyclomatic and cognitive complexity with SARIF output and a baseline quality gate"
+    # The released binary is unsigned/un-notarized, so macOS Gatekeeper marks it
+    # with a quarantine attribute that blocks it on first run. Strip it on
+    # install so `codemetrics` just works.
+    hooks:
+      post:
+        install: |
+          system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/codemetrics"]
+
+release:
+  github:
+    owner: richardwooding
+    name: go-codemetrics
