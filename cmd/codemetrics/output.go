@@ -2,11 +2,10 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"sort"
+	"strconv"
 	"strings"
-	"text/tabwriter"
 )
 
 // metricOf returns the value a row is ranked/filtered by. Cyclomatic is used
@@ -57,22 +56,83 @@ func emitJSON(w io.Writer, rows []row) error {
 	return enc.Encode(rows)
 }
 
-func printTable(w io.Writer, rows []row) {
-	tw := tabwriter.NewWriter(w, 0, 4, 2, ' ', 0)
-	_, _ = fmt.Fprintln(tw, "COGNITIVE\tCYCLOMATIC\tLINES\tFUNCTION\tLOCATION")
+// printTable renders rows as an aligned table, optionally colorized via pal.
+// Columns are padded manually (not text/tabwriter) because tabwriter counts the
+// bytes of ANSI escape sequences as visible width and would misalign colored
+// cells. Widths are measured from the uncolored text; color is applied on top.
+func printTable(w io.Writer, rows []row, pal palette) {
+	const gap = 2
+
+	// One row's cells: plain text (for width) alongside its colored display form.
+	type rowCells struct {
+		cogPlain, cogShown string
+		cyc                string
+		lines              string
+		fnPlain, fnShown   string
+		locPlain, locShown string
+	}
+
+	heads := [5]string{"COGNITIVE", "CYCLOMATIC", "LINES", "FUNCTION", "LOCATION"}
+	widths := [5]int{}
+	for i, h := range heads {
+		widths[i] = len(h)
+	}
+
+	// Single pass: build cells and grow column widths from the uncolored text.
+	data := make([]rowCells, 0, len(rows))
 	for _, r := range rows {
 		cog := "-"
 		if r.Cognitive != nil {
-			cog = fmt.Sprintf("%d", *r.Cognitive)
+			cog = strconv.Itoa(*r.Cognitive)
 		}
-		lines := r.EndLine - r.StartLine + 1
-		fn := r.Function
+		fnPlain, fnShown := r.Function, r.Function
 		if len(r.Ignored) > 0 {
 			// Show why an over-threshold function won't gate (short metric names).
 			short := strings.NewReplacer(ruleCognitive, "cognitive", ruleCyclomatic, "cyclomatic").Replace(strings.Join(r.Ignored, ","))
-			fn += " (ignored: " + short + ")"
+			cue := " (ignored: " + short + ")"
+			fnPlain += cue
+			fnShown += pal.muted(cue)
 		}
-		_, _ = fmt.Fprintf(tw, "%s\t%d\t%d\t%s\t%s:%d\n", cog, r.Cyclomatic, lines, fn, r.File, r.StartLine)
+		cyc := strconv.Itoa(r.Cyclomatic)
+		lines := strconv.Itoa(r.EndLine - r.StartLine + 1)
+		loc := r.File + ":" + strconv.Itoa(r.StartLine)
+
+		for i, n := range [5]int{len(cog), len(cyc), len(lines), len(fnPlain), len(loc)} {
+			if n > widths[i] {
+				widths[i] = n
+			}
+		}
+		data = append(data, rowCells{
+			cogPlain: cog, cogShown: pal.cognitive(cog),
+			cyc:     cyc,
+			lines:   lines,
+			fnPlain: fnPlain, fnShown: fnShown,
+			locPlain: loc, locShown: pal.location(loc),
+		})
 	}
-	_ = tw.Flush()
+
+	var b strings.Builder
+	pad := func(n int) { b.WriteString(strings.Repeat(" ", n+gap)) }
+
+	for i, h := range heads {
+		b.WriteString(pal.header(h))
+		if i < len(heads)-1 {
+			pad(widths[i] - len(h))
+		}
+	}
+	b.WriteByte('\n')
+
+	for _, c := range data {
+		b.WriteString(c.cogShown)
+		pad(widths[0] - len(c.cogPlain))
+		b.WriteString(c.cyc)
+		pad(widths[1] - len(c.cyc))
+		b.WriteString(c.lines)
+		pad(widths[2] - len(c.lines))
+		b.WriteString(c.fnShown)
+		pad(widths[3] - len(c.fnPlain))
+		b.WriteString(c.locShown) // last column: no trailing padding
+		b.WriteByte('\n')
+	}
+	_, _ = io.WriteString(w, b.String())
 }
