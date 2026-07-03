@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	codemetrics "github.com/richardwooding/go-codemetrics"
-	"github.com/richardwooding/go-codemetrics/treesitter"
+	codemetrics "github.com/richardwooding/codemetrics"
+	"github.com/richardwooding/codemetrics/treesitter"
 	"github.com/richardwooding/projectdetect"
 )
 

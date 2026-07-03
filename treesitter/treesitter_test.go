@@ -4,8 +4,8 @@ import (
 	"errors"
 	"testing"
 
-	codemetrics "github.com/richardwooding/go-codemetrics"
-	"github.com/richardwooding/go-codemetrics/treesitter"
+	codemetrics "github.com/richardwooding/codemetrics"
+	"github.com/richardwooding/codemetrics/treesitter"
 )
 
 // cognitiveByFunc maps function name -> cognitive complexity for the given

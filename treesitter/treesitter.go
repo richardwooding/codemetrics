@@ -1,9 +1,9 @@
 // Package treesitter computes cyclomatic and cognitive complexity for the
-// non-Go languages that go-codemetrics supports, using the pure-Go tree-sitter
+// non-Go languages that codemetrics supports, using the pure-Go tree-sitter
 // runtime github.com/odvcencio/gotreesitter and its bundled grammars.
 //
 // It is a separate package from the module root so the root
-// (github.com/richardwooding/go-codemetrics) stays dependency-free: programs
+// (github.com/richardwooding/codemetrics) stays dependency-free: programs
 // that only analyse Go never compile gotreesitter or embed any grammars.
 //
 // [Parse] is the simple entry point — give it source, get metrics. [MetricsFromTree]
@@ -32,7 +32,7 @@ import (
 	ts "github.com/odvcencio/gotreesitter"
 	"github.com/odvcencio/gotreesitter/grammars"
 
-	codemetrics "github.com/richardwooding/go-codemetrics"
+	codemetrics "github.com/richardwooding/codemetrics"
 )
 
 // parseTimeoutMicros caps a single tree-sitter parse. A pathological grammar

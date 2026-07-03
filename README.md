@@ -1,6 +1,6 @@
-# go-codemetrics
+# codemetrics
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/richardwooding/go-codemetrics.svg)](https://pkg.go.dev/github.com/richardwooding/go-codemetrics)
+[![Go Reference](https://pkg.go.dev/badge/github.com/richardwooding/codemetrics.svg)](https://pkg.go.dev/github.com/richardwooding/codemetrics)
 
 Per-function **cyclomatic** and **cognitive** complexity across **17
 languages** — a **CLI** and **GitHub Action** that gate pull requests on
@@ -57,16 +57,16 @@ the macOS quarantine attribute on install so it runs without a Gatekeeper
 prompt.
 
 CLI — `go install` (any platform), or download a binary from the
-[releases page](https://github.com/richardwooding/go-codemetrics/releases):
+[releases page](https://github.com/richardwooding/codemetrics/releases):
 
 ```sh
-go install github.com/richardwooding/go-codemetrics/cmd/codemetrics@latest
+go install github.com/richardwooding/codemetrics/cmd/codemetrics@latest
 ```
 
 Library:
 
 ```sh
-go get github.com/richardwooding/go-codemetrics
+go get github.com/richardwooding/codemetrics
 ```
 
 ## GitHub Action (PR complexity gate)
@@ -86,7 +86,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0 # required: full history for the diff's merge-base
-      - uses: richardwooding/go-codemetrics@v0.7.1
+      - uses: richardwooding/codemetrics@v0.8.0
         with:
           max-cognitive: "15"
 ```
@@ -97,7 +97,7 @@ Optionally upload SARIF so findings show up in the PR's Files-changed view:
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
-      - uses: richardwooding/go-codemetrics@v0.7.1
+      - uses: richardwooding/codemetrics@v0.8.0
         with:
           max-cognitive: "15"
           sarif-file: codemetrics.sarif
@@ -231,7 +231,7 @@ package main
 import (
 	"fmt"
 
-	codemetrics "github.com/richardwooding/go-codemetrics"
+	codemetrics "github.com/richardwooding/codemetrics"
 )
 
 func main() {
@@ -295,7 +295,7 @@ parse failure returns an error.
 
 ## Other languages (tree-sitter)
 
-The subpackage [`github.com/richardwooding/go-codemetrics/treesitter`](./treesitter)
+The subpackage [`github.com/richardwooding/codemetrics/treesitter`](./treesitter)
 computes the same metrics for **16 more languages** using the pure-Go
 tree-sitter runtime [`gotreesitter`][gotreesitter]:
 
@@ -303,7 +303,7 @@ tree-sitter runtime [`gotreesitter`][gotreesitter]:
 > Ruby · Scala · R · MATLAB · Perl · Swift
 
 ```go
-import "github.com/richardwooding/go-codemetrics/treesitter"
+import "github.com/richardwooding/codemetrics/treesitter"
 
 fns, err := treesitter.Parse("python", src) // -> []codemetrics.FunctionMetrics
 ```
