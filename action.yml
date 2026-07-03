@@ -1,0 +1,118 @@
+name: "codemetrics complexity gate"
+description: "Fail a pull request when a function it touches exceeds a cognitive/cyclomatic complexity threshold (go-codemetrics --diff mode)."
+author: "Richard Wooding"
+branding:
+  icon: "bar-chart-2"
+  color: "purple"
+
+inputs:
+  paths:
+    description: "Space-separated files/directories to analyze."
+    default: "."
+  max-cognitive:
+    description: "Fail when a changed function's cognitive complexity exceeds this (0 = disabled)."
+    default: "15"
+  max-cyclomatic:
+    description: "Fail when a changed function's cyclomatic complexity exceeds this (0 = disabled)."
+    default: "0"
+  base-ref:
+    description: "Base git ref to diff against. Defaults to the pull request's base branch."
+    default: ${{ github.base_ref }}
+  baseline:
+    description: "Optional baseline file; findings recorded in it are suppressed (only new ones fail)."
+    default: ""
+  sarif-file:
+    description: "If set, also write SARIF results here (upload with github/codeql-action/upload-sarif)."
+    default: ""
+  fail-on-findings:
+    description: "Fail the job when new findings remain in the diff (true/false)."
+    default: "true"
+  codemetrics-version:
+    description: 'go-codemetrics release to install (e.g. "v0.7.0") or "latest".'
+    default: "latest"
+  github-token:
+    description: "Token used to download the release binary."
+    default: ${{ github.token }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install codemetrics
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        CM_VERSION: ${{ inputs.codemetrics-version }}
+      run: |
+        set -euo pipefail
+        version="$CM_VERSION"
+        if [ "$version" = "latest" ]; then
+          version="$(gh release view --repo richardwooding/go-codemetrics --json tagName -q .tagName)"
+        fi
+        ver="${version#v}"
+
+        case "$(uname -s)" in
+          Linux)  goos=linux ;;
+          Darwin) goos=darwin ;;
+          *) echo "::error::unsupported runner OS $(uname -s); this action needs a Linux or macOS runner" >&2; exit 1 ;;
+        esac
+        case "$(uname -m)" in
+          x86_64|amd64)   goarch=amd64 ;;
+          arm64|aarch64)  goarch=arm64 ;;
+          *) echo "::error::unsupported runner arch $(uname -m)" >&2; exit 1 ;;
+        esac
+
+        asset="codemetrics_${ver}_${goos}_${goarch}.tar.gz"
+        echo "Installing codemetrics ${version} (${asset})"
+        tmp="$(mktemp -d)"
+        gh release download "$version" --repo richardwooding/go-codemetrics --pattern "$asset" --output "$tmp/cm.tar.gz"
+        tar -xzf "$tmp/cm.tar.gz" -C "$tmp"
+
+        bindir="$HOME/.codemetrics-bin"
+        mkdir -p "$bindir"
+        install -m 0755 "$tmp/codemetrics" "$bindir/codemetrics"
+        echo "$bindir" >> "$GITHUB_PATH"
+        "$bindir/codemetrics" --version
+
+    - name: Run complexity gate
+      shell: bash
+      env:
+        CM_PATHS: ${{ inputs.paths }}
+        CM_MAX_COG: ${{ inputs.max-cognitive }}
+        CM_MAX_CYC: ${{ inputs.max-cyclomatic }}
+        CM_BASE: ${{ inputs.base-ref }}
+        CM_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        CM_BASELINE: ${{ inputs.baseline }}
+        CM_SARIF: ${{ inputs.sarif-file }}
+        CM_FAIL: ${{ inputs.fail-on-findings }}
+      run: |
+        set -euo pipefail
+        base="${CM_BASE:-}"
+        if [ -z "$base" ]; then base="$CM_DEFAULT_BRANCH"; fi
+        echo "Diffing against origin/${base}"
+
+        # The caller must checkout with fetch-depth: 0 so HEAD and the base
+        # share history for the merge-base; fetch the base tip to be safe.
+        git fetch --no-tags --quiet origin "$base"
+
+        args=( --diff "origin/${base}...HEAD" )
+        if [ "${CM_MAX_COG:-0}" != "0" ]; then args+=( --max-cognitive "$CM_MAX_COG" ); fi
+        if [ "${CM_MAX_CYC:-0}" != "0" ]; then args+=( --max-cyclomatic "$CM_MAX_CYC" ); fi
+        if [ -n "${CM_BASELINE:-}" ]; then args+=( --baseline "$CM_BASELINE" ); fi
+        read -ra paths <<< "${CM_PATHS:-.}"
+
+        # Human-readable table in the log; capture the gate's exit code.
+        code=0
+        codemetrics "${args[@]}" "${paths[@]}" || code=$?
+
+        if [ -n "${CM_SARIF:-}" ]; then
+          codemetrics "${args[@]}" --format sarif "${paths[@]}" > "$CM_SARIF" || true
+          echo "Wrote SARIF to ${CM_SARIF}"
+        fi
+
+        if [ "$code" -ne 0 ]; then
+          if [ "${CM_FAIL}" = "true" ]; then
+            echo "::error::codemetrics found new complexity violations introduced by this change"
+            exit "$code"
+          fi
+          echo "::warning::codemetrics found new complexity violations (fail-on-findings=false)"
+        fi

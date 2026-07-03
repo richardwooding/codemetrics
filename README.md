@@ -212,7 +212,8 @@ codemetrics --diff origin/main...HEAD --max-cognitive 15 .
 their changed regions. Combine with `--format sarif` to upload PR-scoped
 findings, or with `--baseline` to also suppress known offenders among them.
 
-A GitHub Actions PR gate:
+On GitHub, the [Action](#github-action-pr-complexity-gate) below wires this up
+for you; to run the CLI directly in a workflow instead:
 
 ```yaml
 - run: git fetch origin ${{ github.base_ref }}
@@ -222,6 +223,52 @@ A GitHub Actions PR gate:
 > The CLI embeds the tree-sitter grammars (~22 MB binary). The **library**
 > packages stay dependency-light — this weight lives only in the `codemetrics`
 > command.
+
+## GitHub Action (PR complexity gate)
+
+This repo ships a composite Action that runs the `--diff` gate on pull requests:
+it installs the released `codemetrics` binary and fails the check when a function
+the PR **touches** exceeds your threshold. No Docker image — it just downloads
+the binary for the runner.
+
+```yaml
+name: complexity
+on: pull_request
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # required: full history for the diff's merge-base
+      - uses: richardwooding/go-codemetrics@v0.7.0
+        with:
+          max-cognitive: "15"
+```
+
+Optionally upload SARIF so findings show up in the PR's Files-changed view:
+
+```yaml
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: richardwooding/go-codemetrics@v0.7.0
+        with:
+          max-cognitive: "15"
+          sarif-file: codemetrics.sarif
+      - if: always() # upload even when the gate fails
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: codemetrics.sarif
+    permissions:
+      contents: read
+      security-events: write # needed for the SARIF upload
+```
+
+**Inputs:** `paths` (default `.`), `max-cognitive` (default `15`),
+`max-cyclomatic` (default `0`), `base-ref` (default the PR base branch),
+`baseline`, `sarif-file`, `fail-on-findings` (default `true`),
+`codemetrics-version` (default `latest`). Runs on Linux and macOS runners.
 
 ## Other languages (tree-sitter)
 
