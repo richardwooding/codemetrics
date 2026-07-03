@@ -6,7 +6,7 @@ require (
 	github.com/alecthomas/kong v1.15.0
 	github.com/odvcencio/gotreesitter v0.20.9
 	github.com/richardwooding/go-sarif v0.1.0
-	github.com/richardwooding/projectdetect v0.5.0
+	github.com/richardwooding/projectdetect v0.6.0
 )
 
 require (
