@@ -1,183 +1,126 @@
 // Command codemetrics reports per-function cyclomatic and cognitive complexity
-// for Go source files.
+// for source files, with table/JSON/SARIF output and a baseline quality gate.
 //
 // Usage:
 //
 //	codemetrics [flags] path...
 //
-// Each path is a .go file or a directory (walked recursively for .go files,
-// skipping testdata and dot-directories). With no paths, source is read from
-// stdin.
+// Each path is a source file or a directory (walked recursively, skipping
+// build-artefact and dot-directories). Files are routed to a language backend
+// by extension — Go via go/ast, 16 more languages via tree-sitter. With no
+// paths, source is read from stdin (Go by default; override with --lang).
+//
+// Thresholds turn the tool into a quality gate: a function whose cognitive or
+// cyclomatic complexity exceeds --max-cognitive / --max-cyclomatic becomes a
+// finding. With --baseline, findings recorded in the baseline file are
+// suppressed and the command exits non-zero only when a NEW finding appears.
 package main
 
 import (
-	"encoding/json"
-	"flag"
 	"fmt"
-	"io"
-	"io/fs"
 	"os"
-	"path/filepath"
-	"sort"
-	"strings"
-	"text/tabwriter"
 
-	codemetrics "github.com/richardwooding/go-codemetrics"
+	"github.com/alecthomas/kong"
 )
 
-type row struct {
-	File       string `json:"file"`
-	Function   string `json:"function"`
-	Cyclomatic int    `json:"cyclomatic"`
-	Cognitive  *int   `json:"cognitive,omitempty"`
-	StartLine  int    `json:"start_line"`
-	EndLine    int    `json:"end_line"`
+// version stamps the SARIF tool.driver; overridden at build time via -ldflags.
+var version = "dev"
+
+// CLI is the Kong-parsed command line.
+type CLI struct {
+	Paths []string `arg:"" optional:"" name:"path" help:"Files or directories to analyze; reads stdin when none are given."`
+
+	Sort   string `help:"Sort key for display: cognitive or cyclomatic." enum:"cognitive,cyclomatic" default:"cognitive"`
+	Top    int    `help:"Show only the top N rows (0 = all)."`
+	Min    int    `help:"Only show functions whose sort metric is >= this."`
+	Format string `short:"f" help:"Output format: table, json, or sarif." enum:"table,json,sarif" default:"table"`
+	Lang   string `help:"Force a language id for all inputs instead of detecting by extension (also sets the language for stdin)."`
+
+	MaxCognitive  int `help:"Flag functions whose cognitive complexity exceeds this (0 = disabled)."`
+	MaxCyclomatic int `help:"Flag functions whose cyclomatic complexity exceeds this (0 = disabled)."`
+
+	Baseline      string `type:"path" help:"Baseline file: findings recorded in it are suppressed; exit non-zero only on new findings."`
+	WriteBaseline string `type:"path" help:"Write current findings to this baseline file and exit 0."`
 }
 
 func main() {
-	var (
-		asJSON  = flag.Bool("json", false, "emit JSON instead of a table")
-		sortKey = flag.String("sort", "cognitive", "sort key: cognitive | cyclomatic")
-		top     = flag.Int("top", 0, "show only the top N rows (0 = all)")
-		min     = flag.Int("min", 0, "only show functions whose sort metric is >= this")
+	var cli CLI
+	kong.Parse(&cli,
+		kong.Name("codemetrics"),
+		kong.Description("Per-function cyclomatic and cognitive complexity, with SARIF output and a baseline quality gate."),
+		kong.UsageOnError(),
 	)
-	flag.Parse()
-
-	rows, err := collect(flag.Args())
+	code, err := run(cli)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "codemetrics:", err)
-		os.Exit(1)
-	}
-
-	metric := func(r row) int {
-		if *sortKey == "cyclomatic" || r.Cognitive == nil {
-			return r.Cyclomatic
+		if code == 0 {
+			code = 1
 		}
-		return *r.Cognitive
 	}
-	sort.SliceStable(rows, func(i, j int) bool {
-		if mi, mj := metric(rows[i]), metric(rows[j]); mi != mj {
-			return mi > mj
-		}
-		if rows[i].File != rows[j].File {
-			return rows[i].File < rows[j].File
-		}
-		return rows[i].StartLine < rows[j].StartLine
-	})
-
-	if *min > 0 {
-		kept := rows[:0]
-		for _, r := range rows {
-			if metric(r) >= *min {
-				kept = append(kept, r)
-			}
-		}
-		rows = kept
-	}
-	if *top > 0 && len(rows) > *top {
-		rows = rows[:*top]
-	}
-
-	if *asJSON {
-		enc := json.NewEncoder(os.Stdout)
-		enc.SetIndent("", "  ")
-		if err := enc.Encode(rows); err != nil {
-			fmt.Fprintln(os.Stderr, "codemetrics:", err)
-			os.Exit(1)
-		}
-		return
-	}
-	printTable(os.Stdout, rows)
+	os.Exit(code)
 }
 
-// collect parses every source named by args (files, directories, or stdin
-// when empty) and returns one row per function.
-func collect(args []string) ([]row, error) {
-	if len(args) == 0 {
-		src, err := io.ReadAll(os.Stdin)
-		if err != nil {
-			return nil, err
-		}
-		return rowsFor("<stdin>", src)
-	}
-	var out []row
-	for _, arg := range args {
-		info, err := os.Stat(arg)
-		if err != nil {
-			return nil, err
-		}
-		if !info.IsDir() {
-			r, err := rowsForFile(arg)
-			if err != nil {
-				return nil, err
-			}
-			out = append(out, r...)
-			continue
-		}
-		err = filepath.WalkDir(arg, func(path string, d fs.DirEntry, err error) error {
-			if err != nil {
-				return err
-			}
-			if d.IsDir() {
-				if path != arg && (strings.HasPrefix(d.Name(), ".") || d.Name() == "testdata" || d.Name() == "vendor") {
-					return fs.SkipDir
-				}
-				return nil
-			}
-			if !strings.HasSuffix(path, ".go") {
-				return nil
-			}
-			r, ferr := rowsForFile(path)
-			if ferr != nil {
-				return ferr
-			}
-			out = append(out, r...)
-			return nil
-		})
-		if err != nil {
-			return nil, err
-		}
-	}
-	return out, nil
-}
-
-func rowsForFile(path string) ([]row, error) {
-	src, err := os.ReadFile(path)
+// run executes the CLI and returns a process exit code. The gate exits 1 only
+// when thresholds are set and at least one non-suppressed finding remains.
+func run(cli CLI) (int, error) {
+	rows, err := collect(cli.Paths, cli.Lang)
 	if err != nil {
-		return nil, err
+		return 1, err
 	}
-	return rowsFor(path, src)
-}
 
-func rowsFor(name string, src []byte) ([]row, error) {
-	fns, err := codemetrics.ParseGo(src)
-	if err != nil {
-		return nil, fmt.Errorf("%s: %w", name, err)
-	}
-	out := make([]row, 0, len(fns))
-	for _, f := range fns {
-		out = append(out, row{
-			File:       name,
-			Function:   f.QualifiedName(),
-			Cyclomatic: f.Cyclomatic,
-			Cognitive:  f.Cognitive,
-			StartLine:  f.StartLine,
-			EndLine:    f.EndLine,
-		})
-	}
-	return out, nil
-}
+	sortRows(rows, cli.Sort)
+	display := applyMinTop(rows, cli.Sort, cli.Min, cli.Top)
 
-func printTable(w io.Writer, rows []row) {
-	tw := tabwriter.NewWriter(w, 0, 4, 2, ' ', 0)
-	_, _ = fmt.Fprintln(tw, "COGNITIVE\tCYCLOMATIC\tLINES\tFUNCTION\tLOCATION")
-	for _, r := range rows {
-		cog := "-"
-		if r.Cognitive != nil {
-			cog = fmt.Sprintf("%d", *r.Cognitive)
+	findings := computeFindings(rows, cli.MaxCognitive, cli.MaxCyclomatic)
+	gateActive := cli.MaxCognitive > 0 || cli.MaxCyclomatic > 0
+
+	// --write-baseline records the current findings and exits, never gating.
+	if cli.WriteBaseline != "" {
+		if err := writeBaseline(cli.WriteBaseline, findings); err != nil {
+			return 1, err
 		}
-		lines := r.EndLine - r.StartLine + 1
-		_, _ = fmt.Fprintf(tw, "%s\t%d\t%d\t%s\t%s:%d\n", cog, r.Cyclomatic, lines, r.Function, r.File, r.StartLine)
+		fmt.Fprintf(os.Stderr, "codemetrics: wrote %d finding(s) to %s\n", len(findings), cli.WriteBaseline)
+		return 0, nil
 	}
-	_ = tw.Flush()
+
+	// Partition findings into those suppressed by the baseline and the new
+	// (active) ones the gate cares about.
+	active := findings
+	if cli.Baseline != "" {
+		base, err := loadBaseline(cli.Baseline)
+		if err != nil {
+			return 1, err
+		}
+		active = active[:0:0]
+		for _, f := range findings {
+			if _, suppressed := base[f.key()]; !suppressed {
+				active = append(active, f)
+			}
+		}
+	}
+
+	switch cli.Format {
+	case "json":
+		if err := emitJSON(os.Stdout, display); err != nil {
+			return 1, err
+		}
+	case "sarif":
+		if err := emitSARIF(os.Stdout, active, cli.MaxCognitive, cli.MaxCyclomatic); err != nil {
+			return 1, err
+		}
+	default:
+		printTable(os.Stdout, display)
+	}
+
+	if gateActive {
+		if cli.Baseline != "" {
+			fmt.Fprintf(os.Stderr, "codemetrics: %d new finding(s), %d suppressed by baseline\n", len(active), len(findings)-len(active))
+		} else {
+			fmt.Fprintf(os.Stderr, "codemetrics: %d finding(s)\n", len(active))
+		}
+		if len(active) > 0 {
+			return 1, nil
+		}
+	}
+	return 0, nil
 }

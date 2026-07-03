@@ -107,19 +107,24 @@ parse failure returns an error.
 
 ## CLI usage
 
+The CLI is built on [Kong][kong] and is **polyglot**: files are routed to a
+language backend by extension via [`projectdetect`][projectdetect] — Go through
+`go/ast`, the other 16 languages through the tree-sitter backend.
+
 ```sh
 # Top 10 functions by cognitive complexity across a tree
-codemetrics -top 10 ./...            # (pass directories or files)
-codemetrics -top 10 internal/
+codemetrics --top 10 ./...            # (pass directories or files)
+codemetrics --top 10 internal/
 
 # Sort by cyclomatic instead, only show the gnarly ones
-codemetrics -sort cyclomatic -min 15 .
+codemetrics --sort cyclomatic --min 15 .
 
 # JSON for tooling / CI
-codemetrics -json ./mypkg | jq '.[] | select(.cognitive > 20)'
+codemetrics --format json ./mypkg | jq '.[] | select(.cognitive > 20)'
 
-# Read from stdin
+# Read from stdin (Go by default; --lang for anything else)
 cat foo.go | codemetrics
+cat foo.py | codemetrics --lang python
 ```
 
 ```
@@ -129,10 +134,57 @@ COGNITIVE  CYCLOMATIC  LINES  FUNCTION            LOCATION
 ...
 ```
 
-Directories are walked recursively for `.go` files, skipping `vendor`,
-`testdata`, and dot-directories.
+Directories are walked recursively, skipping dot-directories, `testdata`, and
+each detected project's build-artefact dirs (`vendor`, `node_modules`,
+`target`, `__pycache__`, …, resolved by `projectdetect`). Files whose extension
+maps to no supported language are ignored.
 
-Flags: `-sort cognitive|cyclomatic`, `-top N`, `-min N`, `-json`.
+Flags: `--sort cognitive|cyclomatic`, `--top N`, `--min N`,
+`--format table|json|sarif`, `--lang <id>`, plus the quality-gate flags below.
+
+> **Flag style changed.** The CLI now uses GNU-style double-dash flags
+> (`--sort`, `--top`, `--min`) and `--json` is replaced by `--format json`.
+
+### Quality gate: SARIF + baseline
+
+Set a threshold and any function above it becomes a **finding**. Findings render
+as [SARIF 2.1.0][sarif] (via [`go-sarif`][go-sarif]) for GitHub Code Scanning,
+and the process exits non-zero when a finding remains — so it gates CI.
+
+```sh
+# Fail the build if any function is too complex; emit SARIF for Code Scanning
+codemetrics --format sarif --max-cognitive 15 --max-cyclomatic 20 . > results.sarif
+```
+
+To adopt the gate on an existing codebase without fixing all debt first, record
+a **baseline**. Baselined findings (matched by rule + file + function, ignoring
+line numbers) are suppressed; the gate then fails only on *new* findings — the
+same pattern as detekt / semgrep.
+
+```sh
+# 1. Record today's findings as the accepted baseline
+codemetrics --max-cognitive 15 --write-baseline .codemetrics-baseline.json .
+
+# 2. In CI: pass unless a NEW violation is introduced
+codemetrics --max-cognitive 15 --baseline .codemetrics-baseline.json .
+```
+
+A GitHub Actions step that uploads the SARIF:
+
+```yaml
+- run: codemetrics --format sarif --max-cognitive 15 . > results.sarif
+  continue-on-error: true          # let the upload run even when the gate fails
+- uses: github/codeql-action/upload-sarif@v3
+  with:
+    sarif_file: results.sarif
+```
+
+Quality-gate flags: `--max-cognitive N`, `--max-cyclomatic N` (0 = disabled),
+`--baseline FILE`, `--write-baseline FILE`.
+
+> The CLI embeds the tree-sitter grammars (~22 MB binary). The **library**
+> packages stay dependency-light — this weight lives only in the `codemetrics`
+> command.
 
 ## Other languages (tree-sitter)
 
@@ -183,5 +235,8 @@ MIT — see [LICENSE](LICENSE).
 [gocognit]: https://github.com/uudashr/gocognit
 [sonar]: https://www.sonarsource.com/docs/CognitiveComplexity.pdf
 [gotreesitter]: https://github.com/odvcencio/gotreesitter
+[kong]: https://github.com/alecthomas/kong
+[go-sarif]: https://github.com/richardwooding/go-sarif
+[projectdetect]: https://github.com/richardwooding/projectdetect
 
 [tss]: https://github.com/richardwooding/treesitter-symbols
