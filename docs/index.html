@@ -143,7 +143,7 @@
 </style>
 </head>
 <body>
-<a href="#main" style="position:absolute;left:-9999px" onfocus="this.style.left='12px';this.style.top='10px';this.style.zIndex='50'">Skip to content</a>
+<a href="#main" style="position:absolute;left:-9999px" onfocus="this.style.left='12px';this.style.top='10px';this.style.zIndex='50'" onblur="this.style.left='-9999px'">Skip to content</a>
 
 <header class="nav">
   <div class="wrap">
@@ -322,6 +322,12 @@ codemetrics --format sarif \
 <script>
   document.getElementById('yr').textContent = new Date().getFullYear();
 
+  // Close the mobile nav when a link inside it is tapped.
+  var navEl = document.getElementById('nav');
+  navEl.addEventListener('click', function(e){
+    if (e.target.tagName === 'A') { navEl.classList.remove('open'); }
+  });
+
   // Per-language hero examples. rows: [cognitive, cyclomatic, function, location]
   var EXAMPLES = {
     python:     {label:'python',     path:'.',               rows:[[57,24,'Query.add_q','sql/query.py:1380'],[41,19,'resolve_lookup','template/base.py:812'],[29,15,'parse_http_date','utils/http.py:176']]},
@@ -369,11 +375,24 @@ codemetrics --format sarif \
   renderExample((document.querySelector('.lang[aria-selected="true"]') || {}).dataset ? document.querySelector('.lang[aria-selected="true"]').dataset.lang : 'python');
   document.querySelectorAll('.copy').forEach(function(b){
     b.addEventListener('click', function(){
-      var el = document.getElementById(b.dataset.t);
-      navigator.clipboard.writeText(el.textContent).then(function(){
+      var text = document.getElementById(b.dataset.t).textContent;
+      function done(){
         var old = b.textContent; b.textContent = 'Copied'; b.classList.add('done');
         setTimeout(function(){ b.textContent = old; b.classList.remove('done'); }, 1400);
-      });
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(fallbackCopy);
+      } else {
+        fallbackCopy();
+      }
+      function fallbackCopy(){
+        // Works over http:// and in older browsers where the async Clipboard API is unavailable.
+        var ta = document.createElement('textarea');
+        ta.value = text; ta.style.position = 'absolute'; ta.style.left = '-9999px';
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); done(); } catch (err) {}
+        document.body.removeChild(ta);
+      }
     });
   });
 </script>
