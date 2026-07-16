@@ -1,3 +1,7 @@
 /codemetrics
 /dist/
 *.out
+
+# playground WASM artifacts (built by CI)
+/docs/playground/codemetrics.wasm
+/docs/playground/wasm_exec.js
