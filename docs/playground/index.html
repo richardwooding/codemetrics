@@ -54,6 +54,9 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     --tok-constant: #79c0ff; --tok-property: #79c0ff; --tok-operator: #ff7b72;
     --tok-punctuation: var(--gl-muted); --tok-tag: #7ee787; --tok-escape: #79c0ff;
   }
+  /* The light token palette is declared twice on purpose: once under the
+     OS-preference media query, once for the explicit data-theme toggle —
+     plain CSS can't share the list. Keep the two blocks identical. */
   @media (prefers-color-scheme: light) { :root {
     --tok-keyword: #cf222e; --tok-string: #0a3069; --tok-function: #8250df;
     --tok-type: #953800; --tok-number: #0550ae; --tok-comment: #6e7781;

@@ -90,6 +90,13 @@ var highlightInherits = map[string]string{
 	"cpp":        "c",
 }
 
+// emptyHighlightResult answers cmHighlight calls with bad arguments or a
+// marshalling failure; marshalled once at startup.
+var emptyHighlightResult = func() string {
+	b, _ := json.Marshal(highlightJSON{Spans: []highlightSpanJSON{}})
+	return string(b)
+}()
+
 // highlighters caches one Highlighter per playground language; nil marks a
 // language whose grammar or highlight query is unavailable in this build, so
 // its editor stays plain text.
@@ -170,13 +177,11 @@ func main() {
 
 	js.Global().Set("cmHighlight", js.FuncOf(func(_ js.Value, args []js.Value) any {
 		if len(args) < 2 {
-			b, _ := json.Marshal(highlightJSON{Spans: []highlightSpanJSON{}})
-			return string(b)
+			return emptyHighlightResult
 		}
 		b, err := json.Marshal(highlight(args[0].String(), args[1].String()))
 		if err != nil {
-			eb, _ := json.Marshal(highlightJSON{Spans: []highlightSpanJSON{}})
-			return string(eb)
+			return emptyHighlightResult
 		}
 		return string(b)
 	}))
