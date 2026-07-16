@@ -4,6 +4,7 @@ on:
     branches: [main]
     paths:
       - "docs/**"
+      - "wasm/**"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -24,6 +25,15 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v7
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - name: Build playground WASM (grammar subset keeps it ~5 MB gzipped)
+        run: |
+          GOOS=js GOARCH=wasm go build -trimpath -ldflags="-s -w" \
+            -tags 'grammar_subset grammar_subset_python grammar_subset_javascript grammar_subset_typescript grammar_subset_rust grammar_subset_java grammar_subset_c grammar_subset_cpp grammar_subset_csharp grammar_subset_ruby grammar_subset_php' \
+            -o docs/playground/codemetrics.wasm ./wasm
+          cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" docs/playground/
       - uses: actions/configure-pages@v6
         with:
           enablement: true # create/enable the Pages site if it isn't already
