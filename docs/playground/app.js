@@ -33,6 +33,7 @@
 
   var $ = function (id) { return document.getElementById(id); };
   var editor = $("src"), status = $("status"), rows = $("rows"), langsBox = $("langs");
+  var hl = $("hl");
   var current = "go";
   var edited = {}; // per-language buffer once the user types
 
@@ -57,6 +58,7 @@
     });
     editor.value = edited[id] != null ? edited[id] : SAMPLES[id];
     analyzeNow();
+    highlightNow();
   }
 
   // --- boot the Go runtime --------------------------------------------------
@@ -78,6 +80,7 @@
   boot.then(function () {
     editor.value = SAMPLES[current];
     analyzeNow();
+    highlightNow();
   }).catch(function (err) {
     status.textContent = "could not load codemetrics.wasm — " + String(err);
     status.className = "gl-hint err";
@@ -86,9 +89,12 @@
   // --- analyze on edit ------------------------------------------------------
   var timer = null;
   editor.addEventListener("input", function () {
+    highlightNow(); // repaint instantly; scoring can lag behind by 250ms
     clearTimeout(timer);
     timer = setTimeout(analyzeNow, 250);
   });
+  editor.addEventListener("scroll", syncScroll);
+  highlightNow(); // paint the underlay immediately; plain text until WASM is ready
   editor.addEventListener("keydown", function (e) {
     if (e.key === "Tab") {
       e.preventDefault();
@@ -97,6 +103,59 @@
       editor.dispatchEvent(new Event("input"));
     }
   });
+
+  // --- syntax highlighting --------------------------------------------------
+  // The WASM module returns capture spans (UTF-16 offsets) from the same
+  // gotreesitter parse that powers the metrics; we paint them onto a <pre>
+  // underlay kept in lockstep with the textarea.
+  var TOK = {
+    keyword: 1, string: 1, "function": 1, type: 1, number: 1, comment: 1,
+    constant: 1, property: 1, operator: 1, punctuation: 1, tag: 1, escape: 1,
+    constructor: 1, delimiter: 1, module: 1
+  };
+
+  function esc(s) {
+    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  function renderSpans(src, spans) {
+    if (!spans.length) return esc(src);
+    var classes = new Array(src.length);
+    spans.forEach(function (s) {
+      var base = String(s.capture || "").split(".")[0];
+      if (!Object.prototype.hasOwnProperty.call(TOK, base)) return;
+      for (var i = s.start; i < s.end && i < src.length; i++) classes[i] = base;
+    });
+    var out = "", i = 0;
+    while (i < src.length) {
+      var c = classes[i], j = i;
+      while (j < src.length && classes[j] === c) j++;
+      var text = esc(src.slice(i, j));
+      out += c ? '<span class="tok-' + c + '">' + text + "</span>" : text;
+      i = j;
+    }
+    return out;
+  }
+
+  function highlightNow() {
+    if (!hl) return;
+    var src = editor.value;
+    var html = esc(src);
+    if (typeof window.cmHighlight === "function") {
+      try {
+        var res = JSON.parse(window.cmHighlight(current, src));
+        html = renderSpans(src, res.spans || []);
+      } catch (err) { /* fall back to plain text */ }
+    }
+    hl.innerHTML = html + "\n"; // trailing newline keeps the last line's height in sync
+    syncScroll();
+  }
+
+  function syncScroll() {
+    if (!hl) return;
+    hl.scrollTop = editor.scrollTop;
+    hl.scrollLeft = editor.scrollLeft;
+  }
 
   function analyzeNow() {
     if (typeof window.cmAnalyze !== "function") return;

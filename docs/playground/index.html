@@ -37,6 +37,50 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     tab-size: 4; white-space: pre; overflow-x: auto; }
   .editor:focus-visible { outline: 2px solid var(--gl-accent); outline-offset: 1px; }
 
+  /* Highlighted editor: transparent-text textarea over a color underlay kept
+     in lockstep by app.js. Tokens are painted by the same gotreesitter parser
+     that scores the code. */
+  .editor-stack { position: relative; }
+  .editor-stack .editor-hl { position: absolute; inset: 0; margin: 0; overflow: hidden;
+    pointer-events: none; user-select: none; }
+  .editor-stack .editor-input { position: relative; z-index: 1; background: transparent;
+    color: transparent; caret-color: var(--gl-fg); }
+  .editor-stack .editor-input::selection { background: color-mix(in srgb, var(--gl-accent) 28%, transparent);
+    color: transparent; }
+
+  :root, :root[data-theme="dark"] {
+    --tok-keyword: #ff7b72; --tok-string: #a5d6ff; --tok-function: #d2a8ff;
+    --tok-type: #ffa657; --tok-number: #79c0ff; --tok-comment: #8b949e;
+    --tok-constant: #79c0ff; --tok-property: #79c0ff; --tok-operator: #ff7b72;
+    --tok-punctuation: var(--gl-muted); --tok-tag: #7ee787; --tok-escape: #79c0ff;
+  }
+  /* The light token palette is declared twice on purpose: once under the
+     OS-preference media query, once for the explicit data-theme toggle —
+     plain CSS can't share the list. Keep the two blocks identical. */
+  @media (prefers-color-scheme: light) { :root {
+    --tok-keyword: #cf222e; --tok-string: #0a3069; --tok-function: #8250df;
+    --tok-type: #953800; --tok-number: #0550ae; --tok-comment: #6e7781;
+    --tok-constant: #0550ae; --tok-property: #0550ae; --tok-operator: #cf222e;
+    --tok-punctuation: var(--gl-muted); --tok-tag: #116329; --tok-escape: #0550ae;
+  } }
+  :root[data-theme="light"] {
+    --tok-keyword: #cf222e; --tok-string: #0a3069; --tok-function: #8250df;
+    --tok-type: #953800; --tok-number: #0550ae; --tok-comment: #6e7781;
+    --tok-constant: #0550ae; --tok-property: #0550ae; --tok-operator: #cf222e;
+    --tok-punctuation: var(--gl-muted); --tok-tag: #116329; --tok-escape: #0550ae;
+  }
+  .tok-keyword { color: var(--tok-keyword); }
+  .tok-string, .tok-escape { color: var(--tok-string); }
+  .tok-function, .tok-constructor { color: var(--tok-function); }
+  .tok-type, .tok-module { color: var(--tok-type); }
+  .tok-number { color: var(--tok-number); }
+  .tok-comment { color: var(--tok-comment); font-style: italic; }
+  .tok-constant { color: var(--tok-constant); }
+  .tok-property { color: var(--tok-property); }
+  .tok-operator { color: var(--tok-operator); }
+  .tok-punctuation, .tok-delimiter { color: var(--tok-punctuation); }
+  .tok-tag { color: var(--tok-tag); }
+
   table.scores { width: 100%; border-collapse: collapse; font-size: .9rem; }
   table.scores th { text-align: left; font-family: var(--gl-mono); font-size: .72rem;
     text-transform: uppercase; letter-spacing: .06em; color: var(--gl-muted);
@@ -102,8 +146,11 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       <div class="gl-badges" role="group" aria-label="Choose a language" id="langs" style="margin-top:20px"></div>
 
       <div class="pg-grid">
-        <textarea class="editor" id="src" spellcheck="false" autocapitalize="off" autocomplete="off"
-          aria-label="Source code to analyze">Loading the analyzer…</textarea>
+        <div class="editor-stack">
+          <pre class="editor editor-hl" id="hl" aria-hidden="true"></pre>
+          <textarea class="editor editor-input" id="src" spellcheck="false" autocapitalize="off" autocomplete="off"
+            aria-label="Source code to analyze">Loading the analyzer…</textarea>
+        </div>
         <div class="gl-card">
           <h3 style="margin-top:0">Functions</h3>
           <p class="gl-hint" id="status" role="status">loading WASM…</p>
