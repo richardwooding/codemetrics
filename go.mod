@@ -4,7 +4,7 @@ go 1.26.2
 
 require (
 	github.com/alecthomas/kong v1.16.0
-	github.com/odvcencio/gotreesitter v0.47.0
+	github.com/odvcencio/gotreesitter v0.47.1
 	github.com/richardwooding/go-sarif v0.1.0
 	github.com/richardwooding/projectdetect v0.7.0
 )
