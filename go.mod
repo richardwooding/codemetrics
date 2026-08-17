@@ -3,8 +3,8 @@ module github.com/richardwooding/codemetrics
 go 1.26.2
 
 require (
-	github.com/alecthomas/kong v1.16.0
-	github.com/odvcencio/gotreesitter v0.48.1
+	github.com/alecthomas/kong v1.16.1
+	github.com/odvcencio/gotreesitter v0.49.0
 	github.com/richardwooding/go-sarif v0.1.0
 	github.com/richardwooding/projectdetect v0.7.0
 )
