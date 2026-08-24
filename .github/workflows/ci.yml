@@ -20,7 +20,9 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
-          go-version: stable
+          # golangci-lint's typecheck must run against the toolchain the module
+          # targets; `stable` drifts ahead of what the pinned linter supports.
+          go-version-file: go.mod
       - uses: golangci/golangci-lint-action@v9
         with:
           version: v2.12.2

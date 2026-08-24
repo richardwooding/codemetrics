@@ -258,7 +258,21 @@ func collectFuncSpans(ls *langState, tree *ts.Tree, src []byte) []Span {
 			}
 		}
 	}
-	return spans
+	// A grammar's bundled tags query and the supplemental span query can both
+	// match the same definition (swift gained upstream tags in gotreesitter
+	// v0.50), and duplicate ranges corrupt the exact-range span lookup in the
+	// cognitive walk. Keep the first span per byte range.
+	seen := make(map[[2]uint32]bool, len(spans))
+	kept := spans[:0]
+	for _, s := range spans {
+		k := [2]uint32{s.StartByte, s.EndByte}
+		if seen[k] {
+			continue
+		}
+		seen[k] = true
+		kept = append(kept, s)
+	}
+	return kept
 }
 
 // innermostFuncSpanIndex returns the index of the smallest function span
