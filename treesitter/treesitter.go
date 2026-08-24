@@ -178,30 +178,49 @@ func MetricsFromTree(language string, tree *ts.Tree, lang *ts.Language, spans []
 	if tree == nil || len(spans) == 0 {
 		return nil
 	}
-	decisions := make([]int, len(spans))
+	// Callers can legitimately hand in duplicate spans (a grammar's tags query
+	// and a supplemental query matching the same definition). Duplicate byte
+	// ranges would corrupt the exact-range span lookup in the cognitive walk,
+	// so compute over unique ranges and fan the results back out.
+	var uniq []Span
+	idxFor := make([]int, len(spans)) // spans index -> uniq index
+	byRange := make(map[[2]uint32]int, len(spans))
+	for i, s := range spans {
+		k := [2]uint32{s.StartByte, s.EndByte}
+		if j, ok := byRange[k]; ok {
+			idxFor[i] = j
+			continue
+		}
+		byRange[k] = len(uniq)
+		idxFor[i] = len(uniq)
+		uniq = append(uniq, s)
+	}
+	decisions := make([]int, len(uniq))
 	if dq := decisionQueryFor(language, lang); dq != nil {
 		for _, m := range dq.Execute(tree) {
 			for _, c := range m.Captures {
 				if c.Name != "decision" {
 					continue
 				}
-				if i := innermostFuncSpanIndex(spans, c.Node.StartByte()); i >= 0 {
+				if i := innermostFuncSpanIndex(uniq, c.Node.StartByte()); i >= 0 {
 					decisions[i]++
 				}
 			}
 		}
 	}
-	cognitive := cognitiveComplexity(language, lang, tree, spans)
+	cognitive := cognitiveComplexity(language, lang, tree, uniq)
 	out := make([]codemetrics.FunctionMetrics, 0, len(spans))
 	for i, s := range spans {
+		j := idxFor[i]
 		m := codemetrics.FunctionMetrics{
 			Name:       s.Name,
-			Cyclomatic: 1 + decisions[i],
+			Cyclomatic: 1 + decisions[j],
 			StartLine:  s.StartLine,
 			EndLine:    s.EndLine,
 		}
-		if cognitive != nil && i < len(cognitive) && cognitive[i] != nil {
-			m.Cognitive = cognitive[i]
+		if cognitive != nil && j < len(cognitive) && cognitive[j] != nil {
+			v := *cognitive[j]
+			m.Cognitive = &v
 		}
 		out = append(out, m)
 	}

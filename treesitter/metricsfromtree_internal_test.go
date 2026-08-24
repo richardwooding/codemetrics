@@ -49,3 +49,37 @@ func TestMetricsFromTreeMatchesParse(t *testing.T) {
 		})
 	}
 }
+
+// Duplicate spans (same byte range twice — a grammar's tags query and a
+// supplemental query matching the same definition) must each receive the full
+// metrics, not have one entry silently zeroed by the exact-range span lookup
+// in the cognitive walk.
+func TestMetricsFromTreeDuplicateSpans(t *testing.T) {
+	src := []byte("func f(_ x: Int) -> Int {\n  if x > 0 { return 1 }\n  return 0\n}\n")
+	ls := langFor("swift")
+	if ls == nil {
+		t.Fatal("no langState for swift")
+	}
+	tree, err := ls.pool.Parse(src)
+	if err != nil || tree == nil {
+		t.Fatalf("parse: %v", err)
+	}
+	spans := collectFuncSpans(ls, tree, src)
+	if len(spans) != 1 {
+		t.Fatalf("collectFuncSpans = %d spans, want 1", len(spans))
+	}
+	got := MetricsFromTree("swift", tree, ls.lang, []Span{spans[0], spans[0]})
+	if len(got) != 2 {
+		t.Fatalf("len = %d, want 2", len(got))
+	}
+	for i, m := range got {
+		if m.Cyclomatic != 2 {
+			t.Errorf("[%d] Cyclomatic = %d, want 2", i, m.Cyclomatic)
+		}
+		if m.Cognitive == nil {
+			t.Errorf("[%d] Cognitive = nil, want 1", i)
+		} else if *m.Cognitive != 1 {
+			t.Errorf("[%d] Cognitive = %d, want 1", i, *m.Cognitive)
+		}
+	}
+}
