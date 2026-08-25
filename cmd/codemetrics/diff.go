@@ -97,11 +97,11 @@ func parseDiff(root string, diff []byte) map[string][]lineRange {
 // parseHunkNewRange reads the new-side range from a hunk header of the form
 // "@@ -a,b +c,d @@ ...". Returns false for a hunk with no new lines (d == 0).
 func parseHunkNewRange(header string) (lineRange, bool) {
-	plus := strings.IndexByte(header, '+')
-	if plus < 0 {
+	_, after, ok := strings.Cut(header, "+")
+	if !ok {
 		return lineRange{}, false
 	}
-	tok := header[plus+1:]
+	tok := after
 	if sp := strings.IndexByte(tok, ' '); sp >= 0 {
 		tok = tok[:sp]
 	}

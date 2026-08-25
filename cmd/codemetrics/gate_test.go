@@ -7,12 +7,13 @@ import (
 	"testing"
 )
 
-func i(n int) *int { return &n }
+//go:fix inline
+func i(n int) *int { return new(n) }
 
 func TestComputeFindings(t *testing.T) {
 	rows := []row{
-		{File: "a.go", Function: "Big", Cyclomatic: 20, Cognitive: i(30), StartLine: 1, EndLine: 40},
-		{File: "a.go", Function: "Small", Cyclomatic: 2, Cognitive: i(1), StartLine: 50, EndLine: 55},
+		{File: "a.go", Function: "Big", Cyclomatic: 20, Cognitive: new(30), StartLine: 1, EndLine: 40},
+		{File: "a.go", Function: "Small", Cyclomatic: 2, Cognitive: new(1), StartLine: 50, EndLine: 55},
 		{File: "b.rs", Function: "NoCognitive", Cyclomatic: 12, Cognitive: nil, StartLine: 1, EndLine: 9},
 	}
 
