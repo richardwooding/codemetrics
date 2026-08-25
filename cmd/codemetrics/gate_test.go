@@ -7,9 +7,6 @@ import (
 	"testing"
 )
 
-//go:fix inline
-func i(n int) *int { return new(n) }
-
 func TestComputeFindings(t *testing.T) {
 	rows := []row{
 		{File: "a.go", Function: "Big", Cyclomatic: 20, Cognitive: new(30), StartLine: 1, EndLine: 40},
